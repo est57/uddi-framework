@@ -42,6 +42,9 @@ func NewRouter(cfg *config.Config, chainClient *blockchain.Client, zkpService *z
 	r.Use(chimiddleware.Logger)
 	r.Use(chimiddleware.Recoverer)
 	r.Use(chimiddleware.Timeout(30 * time.Second))
+	r.Use(middleware.SecurityHeaders)
+	r.Use(middleware.LimitRequestBody(cfg.MaxRequestBodyBytes))
+	r.Use(middleware.NewRateLimiter(cfg.RateLimitRequests, cfg.RateLimitWindow).Middleware)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   cfg.AllowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},

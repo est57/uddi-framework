@@ -28,6 +28,9 @@ func TestHealth(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", res.Code)
 	}
 	assertJSONField(t, res.Body.Bytes(), "status", "ok")
+	if res.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatalf("expected security headers to be set")
+	}
 }
 
 func TestAPIKeyMiddleware(t *testing.T) {
@@ -109,6 +112,26 @@ func TestAdminAPIKeyLifecycle(t *testing.T) {
 	if retryRes.Code != http.StatusUnauthorized {
 		t.Fatalf("expected revoked key status 401, got %d: %s", retryRes.Code, retryRes.Body.String())
 	}
+}
+
+func TestRateLimit(t *testing.T) {
+	router := newTestRouterWithConfig(t, &config.Config{
+		AllowedOrigins:      []string{"*"},
+		RateLimitRequests:   1,
+		RateLimitWindow:     time.Minute,
+		MaxRequestBodyBytes: 1_048_576,
+	})
+
+	firstRes := performRequest(router, http.MethodGet, "/health", nil, nil)
+	if firstRes.Code != http.StatusOK {
+		t.Fatalf("expected first request status 200, got %d", firstRes.Code)
+	}
+
+	secondRes := performRequest(router, http.MethodGet, "/health", nil, nil)
+	if secondRes.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected second request status 429, got %d: %s", secondRes.Code, secondRes.Body.String())
+	}
+	assertJSONField(t, secondRes.Body.Bytes(), "error", "rate limit exceeded")
 }
 
 func TestDIDLifecycle(t *testing.T) {
@@ -425,6 +448,15 @@ func newTestRouterWithConfig(t *testing.T, cfg *config.Config) http.Handler {
 
 	if len(cfg.AllowedOrigins) == 0 {
 		cfg.AllowedOrigins = []string{"*"}
+	}
+	if cfg.MaxRequestBodyBytes == 0 {
+		cfg.MaxRequestBodyBytes = 1_048_576
+	}
+	if cfg.RateLimitRequests == 0 {
+		cfg.RateLimitRequests = 120
+	}
+	if cfg.RateLimitWindow == 0 {
+		cfg.RateLimitWindow = time.Minute
 	}
 	chainClient, err := blockchain.NewClient("memory://test")
 	if err != nil {

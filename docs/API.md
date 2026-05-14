@@ -26,6 +26,14 @@ Error responses use this shape:
 }
 ```
 
+If the per-IP rate limit is exceeded, the API responds with:
+
+```json
+{
+  "error": "rate limit exceeded"
+}
+```
+
 Admin endpoints require:
 
 ```http

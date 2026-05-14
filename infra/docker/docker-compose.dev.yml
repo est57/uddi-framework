@@ -25,6 +25,9 @@ services:
       - UDDI_REDIS_URL=redis://redis:6379
       - UDDI_ZKP_SERVICE_URL=memory://zkp
       - UDDI_ALLOWED_ORIGINS=*
+      - UDDI_MAX_REQUEST_BODY_BYTES=1048576
+      - UDDI_RATE_LIMIT_REQUESTS=120
+      - UDDI_RATE_LIMIT_WINDOW_SECONDS=60
       - UDDI_JWT_SECRET=dev-secret-change-in-production
       - UDDI_ADMIN_TOKEN=dev-admin-token-change-in-production
     depends_on:

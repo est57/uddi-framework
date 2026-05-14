@@ -18,6 +18,7 @@ Implemented today:
 - Challenge storage abstraction in the API, with memory and Redis-backed implementations.
 - API key validation with memory and Postgres-backed stores, including seeded development credentials.
 - Admin API key management for creating, listing, and revoking service API keys.
+- API hardening middleware for security headers, request body limits, and per-IP rate limiting.
 - Circom circuit drafts for age and citizenship verification.
 - CI workflow for TypeScript and Go checks, with Rust/Docker jobs gated until those packages exist.
 
@@ -302,6 +303,16 @@ When `UDDI_DATABASE_URL` is configured, the API persists DID registry and API ke
 | API key management | Memory store | Postgres `api_keys` table |
 | Credential registry | Memory store | Postgres `credentials` table |
 | ZKP verification | Stub/circuit drafts | Roadmap service |
+
+### API Hardening
+
+The Go API applies security headers, a maximum request body size, and a simple per-IP rate limiter. Configure these values with:
+
+```text
+UDDI_MAX_REQUEST_BODY_BYTES=1048576
+UDDI_RATE_LIMIT_REQUESTS=120
+UDDI_RATE_LIMIT_WINDOW_SECONDS=60
+```
 
 ## Sequence Diagrams
 

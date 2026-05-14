@@ -13,6 +13,7 @@ Implemented today:
 - API key middleware.
 - API key validation with seeded development credentials.
 - Admin API key management for creating, listing, and revoking service API keys.
+- Security headers, request body limits, and per-IP rate limiting.
 - Auth challenge creation.
 - Auth presentation verification with Ed25519.
 - Challenge replay protection.
@@ -60,6 +61,9 @@ Configuration is read from environment variables:
 - `UDDI_ADMIN_TOKEN`
 - `UDDI_ZKP_SERVICE_URL`
 - `UDDI_ALLOWED_ORIGINS`
+- `UDDI_MAX_REQUEST_BODY_BYTES`
+- `UDDI_RATE_LIMIT_REQUESTS`
+- `UDDI_RATE_LIMIT_WINDOW_SECONDS`
 
 ## Run With Docker
 
