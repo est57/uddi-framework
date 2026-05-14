@@ -16,6 +16,7 @@ pnpm add @uddi/core
 - Message signing and signature verification.
 - Auth presentation creation.
 - Verifiable Credential issuance, verification, hashing, and presentation creation.
+- DID/VC structural compliance baseline tests.
 - Shared protocol types.
 
 ## Build And Test

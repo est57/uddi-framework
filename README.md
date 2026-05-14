@@ -21,13 +21,14 @@ Implemented today:
 - API hardening middleware for security headers, request body limits, and per-IP rate limiting.
 - Observability endpoints for liveness, readiness, JSON metrics, and structured request logs.
 - Versioned Postgres schema migrations for DID, API key, and credential tables.
+- DID/VC structural compliance baseline tests in `@uddi/core`.
 - Circom circuit drafts for age and citizenship verification.
 - CI workflow for TypeScript and Go checks, with Rust/Docker jobs gated until those packages exist.
 
 Not implemented yet:
 
 - Substrate/Rust blockchain node and pallets.
-- Full DID/VC compliance test suite.
+- Full W3C DID/VC compliance test suite.
 - Production API key management.
 - Real ZKP prover/verifier service runtime.
 - Mobile identity wallet.
