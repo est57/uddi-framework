@@ -26,6 +26,7 @@ services:
       - UDDI_ZKP_SERVICE_URL=memory://zkp
       - UDDI_ALLOWED_ORIGINS=*
       - UDDI_JWT_SECRET=dev-secret-change-in-production
+      - UDDI_ADMIN_TOKEN=dev-admin-token-change-in-production
     depends_on:
       redis:
         condition: service_healthy

@@ -26,6 +26,13 @@ Error responses use this shape:
 }
 ```
 
+Admin endpoints require:
+
+```http
+X-Admin-Token: dev-admin-token-change-in-production
+Content-Type: application/json
+```
+
 ## Health
 
 ### `GET /health`
@@ -374,6 +381,78 @@ Response:
   "subject": "did:uddi:zExampleIdentifierWithAtLeastFortyCharacters123",
   "types": ["VerifiableCredential", "AgeCredential"],
   "verifiedAt": "2026-05-14T04:00:02Z"
+}
+```
+
+## API Key Management
+
+These endpoints manage service API keys. They require `X-Admin-Token` and never return stored API key hashes. A plaintext API key is returned only once when created.
+
+### `POST /v1/admin/api-keys/`
+
+Request:
+
+```bash
+curl -X POST http://localhost:8080/v1/admin/api-keys/ \
+  -H 'Content-Type: application/json' \
+  -H 'X-Admin-Token: dev-admin-token-change-in-production' \
+  -d '{
+    "serviceId": "merchant-service",
+    "serviceName": "Merchant Service"
+  }'
+```
+
+Response `201`:
+
+```json
+{
+  "apiKey": "uddi_GENERATED_SECRET",
+  "record": {
+    "serviceId": "merchant-service",
+    "serviceName": "Merchant Service",
+    "createdAt": "2026-05-14T04:03:00Z"
+  }
+}
+```
+
+### `GET /v1/admin/api-keys/`
+
+```bash
+curl http://localhost:8080/v1/admin/api-keys/ \
+  -H 'X-Admin-Token: dev-admin-token-change-in-production'
+```
+
+Response:
+
+```json
+{
+  "apiKeys": [
+    {
+      "serviceId": "merchant-service",
+      "serviceName": "Merchant Service",
+      "createdAt": "2026-05-14T04:03:00Z"
+    }
+  ]
+}
+```
+
+### `POST /v1/admin/api-keys/revoke`
+
+```bash
+curl -X POST http://localhost:8080/v1/admin/api-keys/revoke \
+  -H 'Content-Type: application/json' \
+  -H 'X-Admin-Token: dev-admin-token-change-in-production' \
+  -d '{
+    "serviceId": "merchant-service"
+  }'
+```
+
+Response:
+
+```json
+{
+  "status": "REVOKED",
+  "serviceId": "merchant-service"
 }
 ```
 

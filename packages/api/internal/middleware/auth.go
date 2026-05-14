@@ -37,3 +37,19 @@ func RequireAPIKeyPresence(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+func RequireAdminToken(adminToken string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if adminToken == "" {
+				response.Error(w, http.StatusServiceUnavailable, "admin API is not configured")
+				return
+			}
+			if r.Header.Get("X-Admin-Token") != adminToken {
+				response.Error(w, http.StatusUnauthorized, "invalid admin token")
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}

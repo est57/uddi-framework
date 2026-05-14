@@ -12,6 +12,7 @@ Implemented today:
 - DID register, resolve, and revoke.
 - API key middleware.
 - API key validation with seeded development credentials.
+- Admin API key management for creating, listing, and revoking service API keys.
 - Auth challenge creation.
 - Auth presentation verification with Ed25519.
 - Challenge replay protection.
@@ -56,6 +57,7 @@ Configuration is read from environment variables:
 - `UDDI_BLOCKCHAIN_RPC`
 - `UDDI_DATABASE_URL`
 - `UDDI_REDIS_URL`
+- `UDDI_ADMIN_TOKEN`
 - `UDDI_ZKP_SERVICE_URL`
 - `UDDI_ALLOWED_ORIGINS`
 

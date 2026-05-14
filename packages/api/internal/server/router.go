@@ -32,6 +32,7 @@ func NewRouter(cfg *config.Config, chainClient *blockchain.Client, zkpService *z
 	}
 	verifyHandler := handlers.NewVerifyHandlerWithChallengeStore(chainClient, zkpService, challengeStore)
 	credHandler := handlers.NewCredentialHandler(chainClient, credentialStore)
+	apiKeyHandler := handlers.NewAPIKeyHandler(apiKeyStore)
 	proofHandler := handlers.NewProofHandler(zkpService, chainClient)
 
 	r := chi.NewRouter()
@@ -44,7 +45,7 @@ func NewRouter(cfg *config.Config, chainClient *blockchain.Client, zkpService *z
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   cfg.AllowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-API-Key", "X-Service-ID"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-API-Key", "X-Service-ID", "X-Admin-Token"},
 		AllowCredentials: true,
 	}))
 
@@ -74,6 +75,15 @@ func NewRouter(cfg *config.Config, chainClient *blockchain.Client, zkpService *z
 			r.Post("/challenge", verifyHandler.CreateChallenge)
 			r.Post("/auth", verifyHandler.VerifyAuth)
 			r.Post("/claim", verifyHandler.VerifyClaim)
+		})
+
+		r.Route("/admin", func(r chi.Router) {
+			r.Use(middleware.RequireAdminToken(cfg.AdminToken))
+			r.Route("/api-keys", func(r chi.Router) {
+				r.Get("/", apiKeyHandler.List)
+				r.Post("/", apiKeyHandler.Create)
+				r.Post("/revoke", apiKeyHandler.Revoke)
+			})
 		})
 
 		r.Route("/proof", func(r chi.Router) {

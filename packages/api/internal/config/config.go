@@ -12,6 +12,7 @@ type Config struct {
 	ZKPServiceURL  string
 	DatabaseURL    string
 	RedisURL       string
+	AdminToken     string
 	AllowedOrigins []string
 }
 
@@ -23,6 +24,7 @@ func Load() (*Config, error) {
 		ZKPServiceURL:  env("UDDI_ZKP_SERVICE_URL", "http://localhost:3000"),
 		DatabaseURL:    env("UDDI_DATABASE_URL", ""),
 		RedisURL:       env("UDDI_REDIS_URL", ""),
+		AdminToken:     env("UDDI_ADMIN_TOKEN", ""),
 		AllowedOrigins: splitCSV(env("UDDI_ALLOWED_ORIGINS", "*")),
 	}, nil
 }

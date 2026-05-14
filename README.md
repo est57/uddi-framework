@@ -17,6 +17,7 @@ Implemented today:
 - API-side Ed25519 Verifiable Credential proof verification for credential issue and status verification.
 - Challenge storage abstraction in the API, with memory and Redis-backed implementations.
 - API key validation with memory and Postgres-backed stores, including seeded development credentials.
+- Admin API key management for creating, listing, and revoking service API keys.
 - Circom circuit drafts for age and citizenship verification.
 - CI workflow for TypeScript and Go checks, with Rust/Docker jobs gated until those packages exist.
 
@@ -182,6 +183,9 @@ Current REST surface:
 - `POST /v1/verify/challenge` - API key required
 - `POST /v1/verify/auth` - API key required
 - `POST /v1/verify/claim` - API key required, ZKP stub
+- `GET /v1/admin/api-keys/` - admin token required
+- `POST /v1/admin/api-keys/` - admin token required
+- `POST /v1/admin/api-keys/revoke` - admin token required
 - `POST /v1/proof/generate` - ZKP stub
 - `GET /v1/registry/stats`
 
@@ -295,6 +299,7 @@ When `UDDI_DATABASE_URL` is configured, the API persists DID registry and API ke
 | DID registry | Memory store | Postgres `dids` table |
 | API keys | Memory seeded keys | Postgres `api_keys` table |
 | Auth challenges | Memory store | Redis with TTL |
+| API key management | Memory store | Postgres `api_keys` table |
 | Credential registry | Memory store | Postgres `credentials` table |
 | ZKP verification | Stub/circuit drafts | Roadmap service |
 

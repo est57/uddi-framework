@@ -41,6 +41,76 @@ func TestAPIKeyMiddleware(t *testing.T) {
 	assertJSONField(t, res.Body.Bytes(), "error", "missing API key")
 }
 
+func TestAdminAPIKeyLifecycle(t *testing.T) {
+	router := newTestRouterWithConfig(t, &config.Config{
+		AdminToken:     "admin-token",
+		AllowedOrigins: []string{"*"},
+	})
+
+	unauthorizedRes := performRequest(router, http.MethodPost, "/v1/admin/api-keys/", map[string]any{
+		"serviceId": "production-service",
+	}, nil)
+	if unauthorizedRes.Code != http.StatusUnauthorized {
+		t.Fatalf("expected unauthorized status 401, got %d: %s", unauthorizedRes.Code, unauthorizedRes.Body.String())
+	}
+
+	createRes := performRequest(router, http.MethodPost, "/v1/admin/api-keys/", map[string]any{
+		"serviceId":   "production-service",
+		"serviceName": "Production Service",
+	}, adminHeaders())
+	if createRes.Code != http.StatusCreated {
+		t.Fatalf("expected create status 201, got %d: %s", createRes.Code, createRes.Body.String())
+	}
+
+	var createPayload struct {
+		APIKey string `json:"apiKey"`
+		Record struct {
+			ServiceID string `json:"serviceId"`
+		} `json:"record"`
+	}
+	if err := json.Unmarshal(createRes.Body.Bytes(), &createPayload); err != nil {
+		t.Fatalf("decode create response: %v", err)
+	}
+	if createPayload.APIKey == "" {
+		t.Fatalf("expected generated API key")
+	}
+	if createPayload.Record.ServiceID != "production-service" {
+		t.Fatalf("expected production-service record, got %s", createPayload.Record.ServiceID)
+	}
+
+	challengeRes := performRequest(router, http.MethodPost, "/v1/verify/challenge", map[string]any{
+		"serviceId": "production-service",
+	}, map[string]string{
+		"X-Service-ID": "production-service",
+		"X-API-Key":    createPayload.APIKey,
+	})
+	if challengeRes.Code != http.StatusCreated {
+		t.Fatalf("expected new key to authorize challenge, got %d: %s", challengeRes.Code, challengeRes.Body.String())
+	}
+
+	listRes := performRequest(router, http.MethodGet, "/v1/admin/api-keys/", nil, adminHeaders())
+	if listRes.Code != http.StatusOK {
+		t.Fatalf("expected list status 200, got %d: %s", listRes.Code, listRes.Body.String())
+	}
+
+	revokeRes := performRequest(router, http.MethodPost, "/v1/admin/api-keys/revoke", map[string]any{
+		"serviceId": "production-service",
+	}, adminHeaders())
+	if revokeRes.Code != http.StatusOK {
+		t.Fatalf("expected revoke status 200, got %d: %s", revokeRes.Code, revokeRes.Body.String())
+	}
+
+	retryRes := performRequest(router, http.MethodPost, "/v1/verify/challenge", map[string]any{
+		"serviceId": "production-service",
+	}, map[string]string{
+		"X-Service-ID": "production-service",
+		"X-API-Key":    createPayload.APIKey,
+	})
+	if retryRes.Code != http.StatusUnauthorized {
+		t.Fatalf("expected revoked key status 401, got %d: %s", retryRes.Code, retryRes.Body.String())
+	}
+}
+
 func TestDIDLifecycle(t *testing.T) {
 	router := newTestRouter(t)
 	identity := newTestIdentity(t)
@@ -345,8 +415,16 @@ type testChallenge struct {
 func newTestRouter(t *testing.T) http.Handler {
 	t.Helper()
 
-	cfg := &config.Config{
+	return newTestRouterWithConfig(t, &config.Config{
 		AllowedOrigins: []string{"*"},
+	})
+}
+
+func newTestRouterWithConfig(t *testing.T, cfg *config.Config) http.Handler {
+	t.Helper()
+
+	if len(cfg.AllowedOrigins) == 0 {
+		cfg.AllowedOrigins = []string{"*"}
 	}
 	chainClient, err := blockchain.NewClient("memory://test")
 	if err != nil {
@@ -454,6 +532,12 @@ func apiHeaders() map[string]string {
 	return map[string]string{
 		"X-API-Key":    "test-key",
 		"X-Service-ID": "test-service",
+	}
+}
+
+func adminHeaders() map[string]string {
+	return map[string]string{
+		"X-Admin-Token": "admin-token",
 	}
 }
 
