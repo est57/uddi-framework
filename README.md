@@ -14,6 +14,7 @@ Implemented today:
 - Go API gateway with testable router, DID register/resolve/revoke endpoints, API key middleware, auth challenge generation, Ed25519 auth presentation verification, replay protection, and timestamp/service binding checks.
 - DID storage abstraction in the API, with memory and Postgres-backed implementations.
 - Credential registry abstraction in the API, with memory and Postgres-backed implementations.
+- API-side Ed25519 Verifiable Credential proof verification for credential issue and status verification.
 - Challenge storage abstraction in the API, with memory and Redis-backed implementations.
 - API key validation with memory and Postgres-backed stores, including seeded development credentials.
 - Circom circuit drafts for age and citizenship verification.
@@ -22,7 +23,7 @@ Implemented today:
 Not implemented yet:
 
 - Substrate/Rust blockchain node and pallets.
-- Full API-side Verifiable Credential cryptographic validation and compliance testing.
+- Full DID/VC compliance test suite.
 - Production API key management.
 - Real ZKP prover/verifier service runtime.
 - Mobile identity wallet.
@@ -276,9 +277,15 @@ When `UDDI_DATABASE_URL` is configured, the API persists DID registry and API ke
 5. Verifier checks authentication
    UddiVerifier -> API /v1/verify/auth
    - API consumes challenge once
-   - validates service binding and timestamp window
-   - resolves DID public key
-   - verifies Ed25519 signature
+- validates service binding and timestamp window
+- resolves DID public key
+- verifies Ed25519 signature
+
+6. Issuer registers credential
+   UddiClient / issuer app -> API /v1/credentials/issue -> CredentialStore
+   - API resolves issuer and subject DIDs
+   - verifies Ed25519 credential proof
+   - stores credential registry record
 ```
 
 ### Storage Modes
@@ -416,7 +423,7 @@ sequenceDiagram
 ## Roadmap
 
 - Replace in-memory blockchain client with real registry integration.
-- Add full API-side cryptographic VC verification and DID/VC compliance coverage.
+- Add DID/VC compliance coverage.
 - Build ZKP prover/verifier service around the existing circuits.
 - Add compliance tests for DID and Verifiable Credentials.
 - Add mobile wallet/holder application.

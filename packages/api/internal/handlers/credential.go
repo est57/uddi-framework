@@ -1,9 +1,14 @@
 package handlers
 
 import (
+	"bytes"
+	"context"
+	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -52,8 +57,9 @@ func (h *CredentialHandler) Issue(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusBadRequest, "credential subject DID not found")
 		return
 	}
-	if _, err := h.chain.ResolveDID(r.Context(), record.IssuerDID); err != nil {
-		response.Error(w, http.StatusBadRequest, "credential issuer DID not found")
+
+	if valid, reason := h.verifyCredentialProof(r.Context(), record); !valid {
+		response.Error(w, http.StatusBadRequest, reason)
 		return
 	}
 
@@ -118,6 +124,9 @@ func (h *CredentialHandler) Verify(w http.ResponseWriter, r *http.Request) {
 	}
 
 	valid, reason := credentialStatus(record, time.Now().UTC())
+	if valid {
+		valid, reason = h.verifyCredentialProof(r.Context(), *record)
+	}
 	response.JSON(w, http.StatusOK, map[string]any{
 		"id":         record.ID,
 		"valid":      valid,
@@ -225,4 +234,117 @@ func credentialStatus(record *CredentialRecord, now time.Time) (bool, string) {
 func stringField(payload map[string]any, key string) (string, bool) {
 	value, ok := payload[key].(string)
 	return value, ok && value != ""
+}
+
+func (h *CredentialHandler) verifyCredentialProof(ctx context.Context, record CredentialRecord) (bool, string) {
+	issuerDoc, err := h.chain.ResolveDID(ctx, record.IssuerDID)
+	if err != nil {
+		return false, "credential issuer DID not found"
+	}
+	if issuerDoc.Deactivated {
+		return false, "credential issuer DID is deactivated"
+	}
+
+	publicKey, err := base64.StdEncoding.DecodeString(issuerDoc.PublicKeyBase64)
+	if err != nil || len(publicKey) != ed25519.PublicKeySize {
+		return false, "invalid issuer public key"
+	}
+
+	proof, ok := record.Credential["proof"].(map[string]any)
+	if !ok {
+		return false, "credential proof is required"
+	}
+	proofValue, ok := stringField(proof, "proofValue")
+	if !ok {
+		return false, "credential proofValue is required"
+	}
+	proofType, ok := stringField(proof, "type")
+	if !ok || proofType != "Ed25519Signature2020" {
+		return false, "unsupported credential proof type"
+	}
+	proofPurpose, ok := stringField(proof, "proofPurpose")
+	if !ok || proofPurpose != "assertionMethod" {
+		return false, "invalid credential proof purpose"
+	}
+	verificationMethod, ok := stringField(proof, "verificationMethod")
+	if !ok || verificationMethod != record.IssuerDID+"#keys-1" {
+		return false, "invalid credential verification method"
+	}
+
+	signature, err := base64.StdEncoding.DecodeString(proofValue)
+	if err != nil {
+		return false, "invalid credential proof encoding"
+	}
+
+	message, err := canonicalCredential(record.Credential)
+	if err != nil {
+		return false, "invalid credential payload"
+	}
+	if !ed25519.Verify(publicKey, []byte(message), signature) {
+		return false, "invalid credential proof"
+	}
+	return true, ""
+}
+
+func canonicalCredential(credential map[string]any) (string, error) {
+	withoutProof := make(map[string]any, len(credential))
+	for key, value := range credential {
+		if key != "proof" {
+			withoutProof[key] = value
+		}
+	}
+	return canonicalizeJSON(withoutProof)
+}
+
+func canonicalizeJSON(value any) (string, error) {
+	switch typed := value.(type) {
+	case map[string]any:
+		keys := make([]string, 0, len(typed))
+		for key := range typed {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+
+		var buf bytes.Buffer
+		buf.WriteByte('{')
+		for i, key := range keys {
+			if i > 0 {
+				buf.WriteByte(',')
+			}
+			keyJSON, err := json.Marshal(key)
+			if err != nil {
+				return "", err
+			}
+			valueJSON, err := canonicalizeJSON(typed[key])
+			if err != nil {
+				return "", err
+			}
+			buf.Write(keyJSON)
+			buf.WriteByte(':')
+			buf.WriteString(valueJSON)
+		}
+		buf.WriteByte('}')
+		return buf.String(), nil
+	case []any:
+		var buf bytes.Buffer
+		buf.WriteByte('[')
+		for i, item := range typed {
+			if i > 0 {
+				buf.WriteByte(',')
+			}
+			itemJSON, err := canonicalizeJSON(item)
+			if err != nil {
+				return "", err
+			}
+			buf.WriteString(itemJSON)
+		}
+		buf.WriteByte(']')
+		return buf.String(), nil
+	default:
+		encoded, err := json.Marshal(typed)
+		if err != nil {
+			return "", err
+		}
+		return string(encoded), nil
+	}
 }

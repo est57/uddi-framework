@@ -244,7 +244,7 @@ Invalid presentations still return `200` with `valid: false`:
 
 ## Credential Endpoints
 
-These endpoints are protected by API key middleware. The API stores already-issued credentials as registry records. Issuer-side signing is still performed outside the API, for example by `@uddi/core`.
+These endpoints are protected by API key middleware. The API stores already-issued credentials as registry records. Issuer-side signing is still performed outside the API, for example by `@uddi/core`; the API verifies the Ed25519 credential proof before storing and during status verification.
 
 ### `GET /v1/credentials/{did}`
 
@@ -291,7 +291,7 @@ Response:
 
 ### `POST /v1/credentials/issue`
 
-Stores a signed Verifiable Credential in the registry. The credential issuer DID and subject DID must already exist in the DID registry.
+Stores a signed Verifiable Credential in the registry. The credential issuer DID and subject DID must already exist in the DID registry. The API verifies `proof.proofValue` against the issuer DID public key over the canonical credential payload without the `proof` field.
 
 Request:
 

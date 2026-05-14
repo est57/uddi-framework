@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"strconv"
 	"testing"
 	"time"
@@ -278,23 +279,7 @@ func TestCredentialLifecycle(t *testing.T) {
 	registerDID(t, router, issuer)
 	registerDID(t, router, subject)
 
-	credential := map[string]any{
-		"@context":     []any{"https://www.w3.org/2018/credentials/v1"},
-		"id":           "urn:uddi:vc:test-credential",
-		"type":         []any{"VerifiableCredential", "AgeCredential"},
-		"issuer":       issuer.did,
-		"issuanceDate": time.Now().UTC().Format(time.RFC3339),
-		"credentialSubject": map[string]any{
-			"id":        subject.did,
-			"birthYear": 2000,
-		},
-		"proof": map[string]any{
-			"type":               "Ed25519Signature2020",
-			"verificationMethod": issuer.did + "#keys-1",
-			"proofPurpose":       "assertionMethod",
-			"proofValue":         "signature",
-		},
-	}
+	credential := signedCredential(t, issuer, subject, "urn:uddi:vc:test-credential")
 
 	issueRes := performRequest(router, http.MethodPost, "/v1/credentials/issue", map[string]any{
 		"credential": credential,
@@ -325,6 +310,25 @@ func TestCredentialLifecycle(t *testing.T) {
 	verifyRevokedRes := performRequest(router, http.MethodGet, "/v1/credentials/urn:uddi:vc:test-credential/verify", nil, apiHeaders())
 	assertJSONField(t, verifyRevokedRes.Body.Bytes(), "valid", false)
 	assertJSONField(t, verifyRevokedRes.Body.Bytes(), "reason", "credential revoked")
+}
+
+func TestCredentialIssueRejectsInvalidProof(t *testing.T) {
+	router := newTestRouter(t)
+	issuer := newTestIdentityWithSuffix(t, "issuerinvalidABCDEFGHJKLMNPQRSTUVWXYZabcdefghij")
+	subject := newTestIdentityWithSuffix(t, "subjectinvalidABCDEFGHJKLMNPQRSTUVWXYZabcdefghij")
+	registerDID(t, router, issuer)
+	registerDID(t, router, subject)
+
+	credential := signedCredential(t, issuer, subject, "urn:uddi:vc:invalid-proof")
+	credential["proof"].(map[string]any)["proofValue"] = signBase64(t, issuer.privateKey, "wrong-message")
+
+	issueRes := performRequest(router, http.MethodPost, "/v1/credentials/issue", map[string]any{
+		"credential": credential,
+	}, apiHeaders())
+	if issueRes.Code != http.StatusBadRequest {
+		t.Fatalf("expected issue status 400, got %d: %s", issueRes.Code, issueRes.Body.String())
+	}
+	assertJSONField(t, issueRes.Body.Bytes(), "error", "invalid credential proof")
 }
 
 type testIdentity struct {
@@ -456,6 +460,86 @@ func apiHeaders() map[string]string {
 func signBase64(t *testing.T, privateKey ed25519.PrivateKey, message string) string {
 	t.Helper()
 	return base64.StdEncoding.EncodeToString(ed25519.Sign(privateKey, []byte(message)))
+}
+
+func signedCredential(t *testing.T, issuer testIdentity, subject testIdentity, id string) map[string]any {
+	t.Helper()
+
+	credential := map[string]any{
+		"@context":     []any{"https://www.w3.org/2018/credentials/v1"},
+		"id":           id,
+		"type":         []any{"VerifiableCredential", "AgeCredential"},
+		"issuer":       issuer.did,
+		"issuanceDate": time.Now().UTC().Format(time.RFC3339),
+		"credentialSubject": map[string]any{
+			"id":        subject.did,
+			"birthYear": 2000,
+		},
+	}
+	message, err := canonicalizeForTest(credential)
+	if err != nil {
+		t.Fatalf("canonicalize credential: %v", err)
+	}
+	credential["proof"] = map[string]any{
+		"type":               "Ed25519Signature2020",
+		"verificationMethod": issuer.did + "#keys-1",
+		"proofPurpose":       "assertionMethod",
+		"proofValue":         signBase64(t, issuer.privateKey, message),
+	}
+	return credential
+}
+
+func canonicalizeForTest(value any) (string, error) {
+	switch typed := value.(type) {
+	case map[string]any:
+		keys := make([]string, 0, len(typed))
+		for key := range typed {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+
+		var buf bytes.Buffer
+		buf.WriteByte('{')
+		for i, key := range keys {
+			if i > 0 {
+				buf.WriteByte(',')
+			}
+			keyJSON, err := json.Marshal(key)
+			if err != nil {
+				return "", err
+			}
+			valueJSON, err := canonicalizeForTest(typed[key])
+			if err != nil {
+				return "", err
+			}
+			buf.Write(keyJSON)
+			buf.WriteByte(':')
+			buf.WriteString(valueJSON)
+		}
+		buf.WriteByte('}')
+		return buf.String(), nil
+	case []any:
+		var buf bytes.Buffer
+		buf.WriteByte('[')
+		for i, item := range typed {
+			if i > 0 {
+				buf.WriteByte(',')
+			}
+			itemJSON, err := canonicalizeForTest(item)
+			if err != nil {
+				return "", err
+			}
+			buf.WriteString(itemJSON)
+		}
+		buf.WriteByte(']')
+		return buf.String(), nil
+	default:
+		encoded, err := json.Marshal(typed)
+		if err != nil {
+			return "", err
+		}
+		return string(encoded), nil
+	}
 }
 
 func assertJSONField(t *testing.T, payload []byte, key string, expected any) {
