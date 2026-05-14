@@ -1,0 +1,17 @@
+{
+  "name": "@uddi/example-auth-flow",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "End-to-end UDDI authentication flow example",
+  "scripts": {
+    "start": "node src/index.mjs",
+    "build": "node --check src/index.mjs",
+    "test": "node --check src/index.mjs",
+    "lint": "node --check src/index.mjs"
+  },
+  "dependencies": {
+    "@uddi/sdk": "workspace:*"
+  },
+  "license": "Apache-2.0"
+}

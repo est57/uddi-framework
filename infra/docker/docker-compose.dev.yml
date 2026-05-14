@@ -1,0 +1,76 @@
+# UDDI Local Development Stack
+# Run: docker-compose -f infra/docker/docker-compose.dev.yml up -d
+#
+# This compose file reflects the current alpha implementation:
+# - API uses Postgres for DID registry persistence.
+# - Redis is available for upcoming challenge/session persistence work.
+# - Blockchain and ZKP runtime services are still roadmap items.
+
+name: uddi-framework
+
+services:
+  # ── UDDI API Gateway ────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ../../packages/api
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"   # REST API
+    environment:
+      - UDDI_ENV=development
+      - UDDI_HTTP_ADDR=:8080
+      - UDDI_GRPC_ADDR=:9090
+      - UDDI_BLOCKCHAIN_RPC=memory://local
+      - UDDI_DATABASE_URL=postgres://uddi:uddi_dev_password@postgres:5432/uddi?sslmode=disable
+      - UDDI_REDIS_URL=redis://redis:6379
+      - UDDI_ZKP_SERVICE_URL=memory://zkp
+      - UDDI_ALLOWED_ORIGINS=*
+      - UDDI_JWT_SECRET=dev-secret-change-in-production
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health >/dev/null"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Redis (challenge cache, session store) ──────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --save 60 1 --loglevel warning
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Postgres (credential registry, API keys) ─────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: uddi
+      POSTGRES_USER: uddi
+      POSTGRES_PASSWORD: uddi_dev_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uddi -d uddi"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  redis_data:
+    name: uddi_redis_data
+  postgres_data:
+    name: uddi_postgres_data

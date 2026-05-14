@@ -1,0 +1,64 @@
+{
+  "name": "uddi-protocol",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.1.1",
+  "description": "Universal Decentralized Digital Identity Protocol",
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "api:test": "cd packages/api && mkdir -p .cache/go-build .cache/go-mod && GOCACHE=$PWD/.cache/go-build GOMODCACHE=$PWD/.cache/go-mod go test ./...",
+    "api:test:postgres": "cd packages/api && mkdir -p .cache/go-build .cache/go-mod && UDDI_TEST_DATABASE_URL='postgres://uddi:uddi_dev_password@127.0.0.1:5432/uddi?sslmode=disable' GOCACHE=$PWD/.cache/go-build GOMODCACHE=$PWD/.cache/go-mod go test ./internal/blockchain ./internal/middleware -run Postgres -count=1",
+    "api:test:redis": "cd packages/api && mkdir -p .cache/go-build .cache/go-mod && UDDI_TEST_REDIS_URL='redis://127.0.0.1:6379/0' GOCACHE=$PWD/.cache/go-build GOMODCACHE=$PWD/.cache/go-mod go test ./internal/handlers -run Redis -count=1",
+    "api:vet": "cd packages/api && mkdir -p .cache/go-build .cache/go-mod && GOCACHE=$PWD/.cache/go-build GOMODCACHE=$PWD/.cache/go-mod go vet ./...",
+    "check": "pnpm build && pnpm test && pnpm lint && pnpm api:test && pnpm api:vet",
+    "example:auth-flow": "pnpm --filter @uddi/example-auth-flow start",
+    "dev": "pnpm -r --parallel dev",
+    "clean": "pnpm -r clean && rm -rf node_modules",
+    "changeset": "changeset",
+    "release": "pnpm build && changeset publish",
+    "docs": "typedoc"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@types/node": "^20.12.0",
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.0",
+    "turbo": "^1.13.0",
+    "typedoc": "^0.25.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/uddi-protocol/uddi.git"
+  },
+  "keywords": [
+    "decentralized-identity",
+    "did",
+    "self-sovereign-identity",
+    "ssi",
+    "zero-knowledge-proof",
+    "blockchain",
+    "privacy",
+    "verifiable-credentials"
+  ],
+  "author": "UDDI Foundation",
+  "license": "Apache-2.0"
+}

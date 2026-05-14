@@ -1,0 +1,99 @@
+package blockchain
+
+import (
+	"context"
+	"encoding/base64"
+	"errors"
+	"testing"
+)
+
+func TestMemoryDIDStoreLifecycle(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryDIDStore()
+	doc := DIDDocument{
+		Context:         []string{"https://www.w3.org/ns/did/v1"},
+		ID:              "did:uddi:z123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghij",
+		PublicKeyBase64: base64.StdEncoding.EncodeToString([]byte("public-key")),
+		Created:         "2026-05-13T00:00:00Z",
+		Updated:         "2026-05-13T00:00:00Z",
+	}
+
+	exists, err := store.Exists(ctx, doc.ID)
+	if err != nil {
+		t.Fatalf("exists before create: %v", err)
+	}
+	if exists {
+		t.Fatal("expected DID not to exist before create")
+	}
+
+	if err := store.Create(ctx, doc); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	resolved, err := store.Resolve(ctx, doc.ID)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if resolved.ID != doc.ID {
+		t.Fatalf("expected DID %s, got %s", doc.ID, resolved.ID)
+	}
+
+	resolved.Deactivated = true
+	if err := store.Update(ctx, *resolved); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+
+	updated, err := store.Resolve(ctx, doc.ID)
+	if err != nil {
+		t.Fatalf("resolve updated: %v", err)
+	}
+	if !updated.Deactivated {
+		t.Fatal("expected DID to be deactivated")
+	}
+}
+
+func TestMemoryDIDStoreReturnsNotFound(t *testing.T) {
+	store := NewMemoryDIDStore()
+
+	_, err := store.Resolve(context.Background(), "did:uddi:zmissing")
+	if !errors.Is(err, ErrDIDNotFound) {
+		t.Fatalf("expected ErrDIDNotFound, got %v", err)
+	}
+}
+
+func TestClientUsesStore(t *testing.T) {
+	ctx := context.Background()
+	client := NewClientWithStore("memory://test", NewMemoryDIDStore())
+	did := "did:uddi:z123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghij"
+
+	txHash, err := client.RegisterDID(ctx, RegisterDIDParams{
+		DID:       did,
+		PublicKey: []byte("public-key"),
+	})
+	if err != nil {
+		t.Fatalf("register DID: %v", err)
+	}
+	if txHash == "" {
+		t.Fatal("expected tx hash")
+	}
+
+	exists, err := client.DIDExists(ctx, did)
+	if err != nil {
+		t.Fatalf("DID exists: %v", err)
+	}
+	if !exists {
+		t.Fatal("expected DID to exist")
+	}
+
+	if err := client.RevokeDID(ctx, did); err != nil {
+		t.Fatalf("revoke DID: %v", err)
+	}
+
+	doc, err := client.ResolveDID(ctx, did)
+	if err != nil {
+		t.Fatalf("resolve DID: %v", err)
+	}
+	if !doc.Deactivated {
+		t.Fatal("expected DID to be deactivated")
+	}
+}

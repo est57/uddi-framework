@@ -1,0 +1,433 @@
+package server_test
+
+import (
+	"bytes"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
+	"testing"
+	"time"
+
+	"github.com/uddi-protocol/uddi/api/internal/blockchain"
+	"github.com/uddi-protocol/uddi/api/internal/config"
+	"github.com/uddi-protocol/uddi/api/internal/server"
+	"github.com/uddi-protocol/uddi/api/internal/zkp"
+)
+
+func TestHealth(t *testing.T) {
+	router := newTestRouter(t)
+
+	res := performRequest(router, http.MethodGet, "/health", nil, nil)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
+	}
+	assertJSONField(t, res.Body.Bytes(), "status", "ok")
+}
+
+func TestAPIKeyMiddleware(t *testing.T) {
+	router := newTestRouter(t)
+
+	res := performRequest(router, http.MethodGet, "/v1/credentials/did:uddi:z123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghij", nil, nil)
+
+	if res.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status 401, got %d", res.Code)
+	}
+	assertJSONField(t, res.Body.Bytes(), "error", "missing API key")
+}
+
+func TestDIDLifecycle(t *testing.T) {
+	router := newTestRouter(t)
+	identity := newTestIdentity(t)
+
+	registerRes := registerDID(t, router, identity)
+	if registerRes.Code != http.StatusCreated {
+		t.Fatalf("expected register status 201, got %d: %s", registerRes.Code, registerRes.Body.String())
+	}
+
+	resolveRes := performRequest(router, http.MethodGet, "/v1/did/"+identity.did, nil, nil)
+	if resolveRes.Code != http.StatusOK {
+		t.Fatalf("expected resolve status 200, got %d: %s", resolveRes.Code, resolveRes.Body.String())
+	}
+	assertNestedJSONField(t, resolveRes.Body.Bytes(), []string{"didDocument", "id"}, identity.did)
+
+	revokeTimestamp := "1700000000001"
+	revokeBody := map[string]any{
+		"did":             identity.did,
+		"signatureBase64": signBase64(t, identity.privateKey, "revoke:"+identity.did+":"+revokeTimestamp),
+		"timestamp":       revokeTimestamp,
+	}
+	revokeRes := performRequest(router, http.MethodPost, "/v1/did/revoke", revokeBody, nil)
+	if revokeRes.Code != http.StatusOK {
+		t.Fatalf("expected revoke status 200, got %d: %s", revokeRes.Code, revokeRes.Body.String())
+	}
+
+	resolveRevokedRes := performRequest(router, http.MethodGet, "/v1/did/"+identity.did, nil, nil)
+	assertNestedJSONField(t, resolveRevokedRes.Body.Bytes(), []string{"didDocument", "deactivated"}, true)
+}
+
+func TestAuthChallengeAndVerification(t *testing.T) {
+	router := newTestRouter(t)
+	identity := newTestIdentity(t)
+	registerDID(t, router, identity)
+
+	challengeRes := performRequest(router, http.MethodPost, "/v1/verify/challenge", map[string]any{
+		"serviceId":   "test-service",
+		"serviceName": "Test Service",
+	}, apiHeaders())
+	if challengeRes.Code != http.StatusCreated {
+		t.Fatalf("expected challenge status 201, got %d: %s", challengeRes.Code, challengeRes.Body.String())
+	}
+
+	var challenge struct {
+		ChallengeID string `json:"challengeId"`
+		Nonce       string `json:"nonce"`
+	}
+	if err := json.Unmarshal(challengeRes.Body.Bytes(), &challenge); err != nil {
+		t.Fatalf("decode challenge: %v", err)
+	}
+
+	timestamp := time.Now().UnixMilli()
+	message := challenge.ChallengeID + ":" + challenge.Nonce + ":" + identity.did + ":" + int64String(timestamp)
+	presentationPayload := map[string]any{
+		"did":         identity.did,
+		"challengeId": challenge.ChallengeID,
+		"signature":   signBase64(t, identity.privateKey, message),
+		"timestamp":   timestamp,
+	}
+	presentationBytes, err := json.Marshal(presentationPayload)
+	if err != nil {
+		t.Fatalf("marshal presentation: %v", err)
+	}
+
+	verifyRes := performRequest(router, http.MethodPost, "/v1/verify/auth", map[string]any{
+		"challengeId":  challenge.ChallengeID,
+		"presentation": base64.StdEncoding.EncodeToString(presentationBytes),
+	}, apiHeaders())
+	if verifyRes.Code != http.StatusOK {
+		t.Fatalf("expected verify status 200, got %d: %s", verifyRes.Code, verifyRes.Body.String())
+	}
+	assertJSONField(t, verifyRes.Body.Bytes(), "valid", true)
+	assertJSONField(t, verifyRes.Body.Bytes(), "did", identity.did)
+
+	replayRes := performRequest(router, http.MethodPost, "/v1/verify/auth", map[string]any{
+		"challengeId":  challenge.ChallengeID,
+		"presentation": base64.StdEncoding.EncodeToString(presentationBytes),
+	}, apiHeaders())
+	assertJSONField(t, replayRes.Body.Bytes(), "valid", false)
+	assertJSONField(t, replayRes.Body.Bytes(), "reason", "challenge not found or presentation missing")
+}
+
+func TestAuthRejectsMismatchedPresentation(t *testing.T) {
+	router := newTestRouter(t)
+	identity := newTestIdentity(t)
+	registerDID(t, router, identity)
+
+	challengeRes := performRequest(router, http.MethodPost, "/v1/verify/challenge", map[string]any{
+		"serviceId": "test-service",
+	}, apiHeaders())
+
+	var challenge struct {
+		ChallengeID string `json:"challengeId"`
+		Nonce       string `json:"nonce"`
+	}
+	if err := json.Unmarshal(challengeRes.Body.Bytes(), &challenge); err != nil {
+		t.Fatalf("decode challenge: %v", err)
+	}
+
+	timestamp := time.Now().UnixMilli()
+	message := challenge.ChallengeID + ":" + challenge.Nonce + ":" + identity.did + ":" + int64String(timestamp)
+	presentationPayload := map[string]any{
+		"did":         identity.did,
+		"challengeId": "different-challenge",
+		"signature":   signBase64(t, identity.privateKey, message),
+		"timestamp":   timestamp,
+	}
+	presentationBytes, err := json.Marshal(presentationPayload)
+	if err != nil {
+		t.Fatalf("marshal presentation: %v", err)
+	}
+
+	verifyRes := performRequest(router, http.MethodPost, "/v1/verify/auth", map[string]any{
+		"challengeId":  challenge.ChallengeID,
+		"presentation": base64.StdEncoding.EncodeToString(presentationBytes),
+	}, apiHeaders())
+
+	assertJSONField(t, verifyRes.Body.Bytes(), "valid", false)
+	assertJSONField(t, verifyRes.Body.Bytes(), "reason", "challenge mismatch")
+}
+
+func TestAuthRejectsServiceMismatchAndConsumesChallenge(t *testing.T) {
+	router := newTestRouter(t)
+	identity := newTestIdentity(t)
+	registerDID(t, router, identity)
+	challenge := createAuthChallenge(t, router)
+	presentation := signedPresentation(t, identity, challenge, time.Now().UnixMilli(), challenge.ChallengeID)
+
+	verifyRes := performRequest(router, http.MethodPost, "/v1/verify/auth", map[string]any{
+		"challengeId":  challenge.ChallengeID,
+		"presentation": presentation,
+		"serviceId":    "wrong-service",
+	}, apiHeaders())
+	assertJSONField(t, verifyRes.Body.Bytes(), "valid", false)
+	assertJSONField(t, verifyRes.Body.Bytes(), "reason", "service mismatch")
+
+	retryRes := performRequest(router, http.MethodPost, "/v1/verify/auth", map[string]any{
+		"challengeId":  challenge.ChallengeID,
+		"presentation": presentation,
+		"serviceId":    "test-service",
+	}, apiHeaders())
+	assertJSONField(t, retryRes.Body.Bytes(), "valid", false)
+	assertJSONField(t, retryRes.Body.Bytes(), "reason", "challenge not found or presentation missing")
+}
+
+func TestAuthRejectsStalePresentationTimestamp(t *testing.T) {
+	router := newTestRouter(t)
+	identity := newTestIdentity(t)
+	registerDID(t, router, identity)
+	challenge := createAuthChallenge(t, router)
+	oldTimestamp := time.Now().Add(-6 * time.Minute).UnixMilli()
+
+	verifyRes := performRequest(router, http.MethodPost, "/v1/verify/auth", map[string]any{
+		"challengeId":  challenge.ChallengeID,
+		"presentation": signedPresentation(t, identity, challenge, oldTimestamp, challenge.ChallengeID),
+		"serviceId":    "test-service",
+	}, apiHeaders())
+
+	assertJSONField(t, verifyRes.Body.Bytes(), "valid", false)
+	assertJSONField(t, verifyRes.Body.Bytes(), "reason", "presentation timestamp outside allowed window")
+}
+
+func TestAuthRejectsFuturePresentationTimestamp(t *testing.T) {
+	router := newTestRouter(t)
+	identity := newTestIdentity(t)
+	registerDID(t, router, identity)
+	challenge := createAuthChallenge(t, router)
+	futureTimestamp := time.Now().Add(45 * time.Second).UnixMilli()
+
+	verifyRes := performRequest(router, http.MethodPost, "/v1/verify/auth", map[string]any{
+		"challengeId":  challenge.ChallengeID,
+		"presentation": signedPresentation(t, identity, challenge, futureTimestamp, challenge.ChallengeID),
+		"serviceId":    "test-service",
+	}, apiHeaders())
+
+	assertJSONField(t, verifyRes.Body.Bytes(), "valid", false)
+	assertJSONField(t, verifyRes.Body.Bytes(), "reason", "presentation timestamp outside allowed window")
+}
+
+func TestAuthRejectsInvalidSignatureAndConsumesChallenge(t *testing.T) {
+	router := newTestRouter(t)
+	identity := newTestIdentity(t)
+	otherIdentity := newTestIdentity(t)
+	registerDID(t, router, identity)
+	challenge := createAuthChallenge(t, router)
+	timestamp := time.Now().UnixMilli()
+	message := challenge.ChallengeID + ":" + challenge.Nonce + ":" + identity.did + ":" + int64String(timestamp)
+	presentationPayload := map[string]any{
+		"did":         identity.did,
+		"challengeId": challenge.ChallengeID,
+		"signature":   signBase64(t, otherIdentity.privateKey, message),
+		"timestamp":   timestamp,
+	}
+	presentationBytes, err := json.Marshal(presentationPayload)
+	if err != nil {
+		t.Fatalf("marshal presentation: %v", err)
+	}
+	presentation := base64.StdEncoding.EncodeToString(presentationBytes)
+
+	verifyRes := performRequest(router, http.MethodPost, "/v1/verify/auth", map[string]any{
+		"challengeId":  challenge.ChallengeID,
+		"presentation": presentation,
+		"serviceId":    "test-service",
+	}, apiHeaders())
+	assertJSONField(t, verifyRes.Body.Bytes(), "valid", false)
+	assertJSONField(t, verifyRes.Body.Bytes(), "reason", "invalid signature")
+
+	retryRes := performRequest(router, http.MethodPost, "/v1/verify/auth", map[string]any{
+		"challengeId":  challenge.ChallengeID,
+		"presentation": signedPresentation(t, identity, challenge, time.Now().UnixMilli(), challenge.ChallengeID),
+		"serviceId":    "test-service",
+	}, apiHeaders())
+	assertJSONField(t, retryRes.Body.Bytes(), "valid", false)
+	assertJSONField(t, retryRes.Body.Bytes(), "reason", "challenge not found or presentation missing")
+}
+
+func TestProofGeneration(t *testing.T) {
+	router := newTestRouter(t)
+
+	res := performRequest(router, http.MethodPost, "/v1/proof/generate", map[string]any{
+		"did":    "did:uddi:z123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghij",
+		"type":   "age",
+		"params": map[string]any{"minimumAge": 18},
+	}, nil)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", res.Code, res.Body.String())
+	}
+	assertNestedJSONField(t, res.Body.Bytes(), []string{"proof", "type"}, "age")
+}
+
+type testIdentity struct {
+	did        string
+	publicKey  ed25519.PublicKey
+	privateKey ed25519.PrivateKey
+}
+
+type testChallenge struct {
+	ChallengeID string `json:"challengeId"`
+	Nonce       string `json:"nonce"`
+}
+
+func newTestRouter(t *testing.T) http.Handler {
+	t.Helper()
+
+	cfg := &config.Config{
+		AllowedOrigins: []string{"*"},
+	}
+	chainClient, err := blockchain.NewClient("memory://test")
+	if err != nil {
+		t.Fatalf("new blockchain client: %v", err)
+	}
+	router, err := server.NewRouter(cfg, chainClient, zkp.NewService("memory://zkp"))
+	if err != nil {
+		t.Fatalf("new router: %v", err)
+	}
+	return router
+}
+
+func newTestIdentity(t *testing.T) testIdentity {
+	t.Helper()
+
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	return testIdentity{
+		did:        "did:uddi:z123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghij",
+		publicKey:  publicKey,
+		privateKey: privateKey,
+	}
+}
+
+func registerDID(t *testing.T, router http.Handler, identity testIdentity) *httptest.ResponseRecorder {
+	t.Helper()
+
+	timestamp := "1700000000000"
+	body := map[string]any{
+		"did":             identity.did,
+		"publicKeyBase64": base64.StdEncoding.EncodeToString(identity.publicKey),
+		"signatureBase64": signBase64(t, identity.privateKey, "register:"+identity.did+":"+timestamp),
+		"timestamp":       timestamp,
+	}
+	return performRequest(router, http.MethodPost, "/v1/did/register", body, nil)
+}
+
+func createAuthChallenge(t *testing.T, router http.Handler) testChallenge {
+	t.Helper()
+
+	challengeRes := performRequest(router, http.MethodPost, "/v1/verify/challenge", map[string]any{
+		"serviceId":   "test-service",
+		"serviceName": "Test Service",
+	}, apiHeaders())
+	if challengeRes.Code != http.StatusCreated {
+		t.Fatalf("expected challenge status 201, got %d: %s", challengeRes.Code, challengeRes.Body.String())
+	}
+
+	var challenge testChallenge
+	if err := json.Unmarshal(challengeRes.Body.Bytes(), &challenge); err != nil {
+		t.Fatalf("decode challenge: %v", err)
+	}
+	return challenge
+}
+
+func signedPresentation(
+	t *testing.T,
+	identity testIdentity,
+	challenge testChallenge,
+	timestamp int64,
+	presentationChallengeID string,
+) string {
+	t.Helper()
+
+	message := challenge.ChallengeID + ":" + challenge.Nonce + ":" + identity.did + ":" + int64String(timestamp)
+	presentationPayload := map[string]any{
+		"did":         identity.did,
+		"challengeId": presentationChallengeID,
+		"signature":   signBase64(t, identity.privateKey, message),
+		"timestamp":   timestamp,
+	}
+	presentationBytes, err := json.Marshal(presentationPayload)
+	if err != nil {
+		t.Fatalf("marshal presentation: %v", err)
+	}
+	return base64.StdEncoding.EncodeToString(presentationBytes)
+}
+
+func performRequest(router http.Handler, method string, path string, body any, headers map[string]string) *httptest.ResponseRecorder {
+	var requestBody bytes.Reader
+	if body != nil {
+		payload, _ := json.Marshal(body)
+		requestBody = *bytes.NewReader(payload)
+	}
+
+	req := httptest.NewRequest(method, path, &requestBody)
+	req.Header.Set("Content-Type", "application/json")
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
+
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	return res
+}
+
+func apiHeaders() map[string]string {
+	return map[string]string{
+		"X-API-Key":    "test-key",
+		"X-Service-ID": "test-service",
+	}
+}
+
+func signBase64(t *testing.T, privateKey ed25519.PrivateKey, message string) string {
+	t.Helper()
+	return base64.StdEncoding.EncodeToString(ed25519.Sign(privateKey, []byte(message)))
+}
+
+func assertJSONField(t *testing.T, payload []byte, key string, expected any) {
+	t.Helper()
+
+	var decoded map[string]any
+	if err := json.Unmarshal(payload, &decoded); err != nil {
+		t.Fatalf("decode json: %v", err)
+	}
+	if decoded[key] != expected {
+		t.Fatalf("expected %s=%v, got %v in %s", key, expected, decoded[key], string(payload))
+	}
+}
+
+func assertNestedJSONField(t *testing.T, payload []byte, path []string, expected any) {
+	t.Helper()
+
+	var value any
+	if err := json.Unmarshal(payload, &value); err != nil {
+		t.Fatalf("decode json: %v", err)
+	}
+	for _, key := range path {
+		next, ok := value.(map[string]any)[key]
+		if !ok {
+			t.Fatalf("missing key %s in %s", key, string(payload))
+		}
+		value = next
+	}
+	if value != expected {
+		t.Fatalf("expected %v, got %v in %s", expected, value, string(payload))
+	}
+}
+
+func int64String(value int64) string {
+	return strconv.FormatInt(value, 10)
+}

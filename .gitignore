@@ -1,0 +1,14 @@
+node_modules/
+.pnpm-store/
+dist/
+packages/*/dist/
+
+.DS_Store
+.env
+.env.*
+!.env.example
+
+coverage/
+.turbo/
+.cache/
+packages/api/.cache/
