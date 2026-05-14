@@ -23,7 +23,7 @@ Implemented today:
 - `DIDStore` abstraction with in-memory and Postgres implementations.
 - Credential registry with in-memory and Postgres implementations.
 - Ed25519 Verifiable Credential proof verification before storing and during status verification.
-- ZKP endpoint stubs.
+- ZKP service adapter with local development validation and remote HTTP prover/verifier support.
 - Versioned Postgres migrations tracked in `schema_migrations`.
 
 ## Run Checks

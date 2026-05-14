@@ -215,11 +215,11 @@ Current REST surface:
 - `GET /v1/credentials/{id}/verify` - API key required
 - `POST /v1/verify/challenge` - API key required
 - `POST /v1/verify/auth` - API key required
-- `POST /v1/verify/claim` - API key required, ZKP stub
+- `POST /v1/verify/claim` - API key required, ZKP adapter verification
 - `GET /v1/admin/api-keys/` - admin token required
 - `POST /v1/admin/api-keys/` - admin token required
 - `POST /v1/admin/api-keys/revoke` - admin token required
-- `POST /v1/proof/generate` - ZKP stub
+- `POST /v1/proof/generate` - ZKP adapter generation
 - `GET /v1/registry/stats`
 
 When `UDDI_DATABASE_URL` is configured, the API persists DID registry and API key data in Postgres. Without it, the API falls back to in-memory stores for lightweight tests and local experimentation.
@@ -242,12 +242,12 @@ When `UDDI_DATABASE_URL` is configured, the API persists DID registry and API ke
 |  Public routes                                                   |
 |  - health                                                        |
 |  - DID register / resolve / revoke                               |
-|  - proof generation stub                                         |
+|  - ZKP proof generation adapter                                  |
 |                                                                  |
 |  Protected routes                                                |
 |  - credential endpoints                                          |
 |  - auth challenge / auth verification                            |
-|  - claim verification stub                                       |
+|  - ZKP claim verification adapter                                |
 |                                                                  |
 |  Security checks                                                 |
 |  - API key + service ID validation                               |
@@ -450,7 +450,7 @@ sequenceDiagram
     VerifierSDK-->>VerifierApp: authentication result
 ```
 
-### Claim Verification With ZKP Stub
+### Claim Verification With ZKP Adapter
 
 ```mermaid
 sequenceDiagram
@@ -461,13 +461,13 @@ sequenceDiagram
     participant VerifierSDK as @uddi/sdk UddiVerifier
     participant API as Go API Gateway
     participant APIKeys as APIKeyStore
-    participant ZKP as ZKP Service / Stub
+    participant ZKP as ZKP Service Adapter
     participant Circuits as Circom Circuits
 
     Holder->>HolderSDK: generateProof({type, params})
     HolderSDK->>API: POST /v1/proof/generate
     API->>ZKP: Generate proof request
-    ZKP-->>API: proof stub today
+    ZKP-->>API: development proof or remote proof
     API-->>HolderSDK: ZkProof
     HolderSDK-->>Holder: proof
 
@@ -477,8 +477,8 @@ sequenceDiagram
     API->>APIKeys: Validate(serviceId, apiKey)
     APIKeys-->>API: valid
     API->>ZKP: Verify proof
-    ZKP-->>Circuits: roadmap prover/verifier integration
-    Circuits-->>ZKP: verification result
+    ZKP->>Circuits: validate proof shape locally or delegate remotely
+    Circuits-->>ZKP: verification result / roadmap circuit backend
     ZKP-->>API: valid / invalid
     API-->>VerifierSDK: ProofVerificationResult
     VerifierSDK-->>VerifierApp: claim verification result

@@ -30,7 +30,16 @@ func (h *ProofHandler) Generate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = h.chain
+	proof, err := h.zkp.Generate(r.Context(), req.Type, req.Params)
+	if err != nil {
+		if err.Error() == "proof type is required" {
+			response.Error(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		response.Error(w, http.StatusBadGateway, err.Error())
+		return
+	}
 	response.JSON(w, http.StatusOK, map[string]any{
-		"proof": h.zkp.Generate(r.Context(), req.Type, req.Params),
+		"proof": proof,
 	})
 }

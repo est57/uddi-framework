@@ -507,7 +507,7 @@ Response:
 
 ### `POST /v1/proof/generate`
 
-Generates a ZKP-shaped stub response today. Runtime prover integration is still roadmap.
+Generates a ZKP-shaped response through the configured ZKP adapter. `memory://zkp` uses a local development proof shape for contract testing. `http://` or `https://` URLs delegate to an external prover at `/generate`.
 
 Request:
 
@@ -531,6 +531,8 @@ Response:
     "protocol": "groth16",
     "curve": "bn128",
     "type": "age_verification",
+    "circuit": "age_verification",
+    "mode": "development",
     "params": {
       "minimumAge": 18
     },
@@ -547,7 +549,7 @@ Response:
 
 ### `POST /v1/verify/claim`
 
-Verifies a ZKP-shaped proof through the current stub service. It returns `valid: true` when `claimType` is non-empty and `proof` is present.
+Verifies a ZKP-shaped proof through the configured ZKP adapter. `memory://zkp` validates the expected Groth16 proof envelope and claim type; `http://` or `https://` URLs delegate to an external verifier at `/verify`.
 
 Request:
 
@@ -561,7 +563,14 @@ curl -X POST http://localhost:8080/v1/verify/claim \
     "claimType": "age_verification",
     "proof": {
       "protocol": "groth16",
-      "proof": {}
+      "curve": "bn128",
+      "type": "age_verification",
+      "proof": {
+        "pi_a": [],
+        "pi_b": [],
+        "pi_c": []
+      },
+      "publicSignals": []
     }
   }'
 ```

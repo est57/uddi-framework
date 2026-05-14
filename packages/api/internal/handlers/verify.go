@@ -229,12 +229,17 @@ func (h *VerifyHandler) VerifyClaim(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = h.chain
-	response.JSON(w, http.StatusOK, map[string]any{
-		"valid":        h.zkp.Verify(r.Context(), req.ClaimType, req.Proof),
+	result := h.zkp.Verify(r.Context(), req.ClaimType, req.Proof)
+	payload := map[string]any{
+		"valid":        result.Valid,
 		"claimType":    req.ClaimType,
 		"verifiedAt":   time.Now().UTC().Format(time.RFC3339),
-		"publicClaims": map[string]any{},
-	})
+		"publicClaims": result.PublicClaims,
+	}
+	if result.Reason != "" {
+		payload["reason"] = result.Reason
+	}
+	response.JSON(w, http.StatusOK, payload)
 }
 
 func randomID() string {

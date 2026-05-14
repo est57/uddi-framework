@@ -380,6 +380,60 @@ func TestProofGeneration(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", res.Code, res.Body.String())
 	}
 	assertNestedJSONField(t, res.Body.Bytes(), []string{"proof", "type"}, "age")
+	assertNestedJSONField(t, res.Body.Bytes(), []string{"proof", "circuit"}, "age_verification")
+}
+
+func TestProofGenerationRequiresType(t *testing.T) {
+	router := newTestRouter(t)
+
+	res := performRequest(router, http.MethodPost, "/v1/proof/generate", map[string]any{
+		"did":    "did:uddi:z123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghij",
+		"params": map[string]any{"minimumAge": 18},
+	}, nil)
+
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", res.Code, res.Body.String())
+	}
+	assertJSONField(t, res.Body.Bytes(), "error", "proof type is required")
+}
+
+func TestClaimVerificationValidatesProofShape(t *testing.T) {
+	router := newTestRouter(t)
+
+	proofRes := performRequest(router, http.MethodPost, "/v1/proof/generate", map[string]any{
+		"did":    "did:uddi:z123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghij",
+		"type":   "age",
+		"params": map[string]any{"minimumAge": 18},
+	}, nil)
+	var proofPayload struct {
+		Proof map[string]any `json:"proof"`
+	}
+	if err := json.Unmarshal(proofRes.Body.Bytes(), &proofPayload); err != nil {
+		t.Fatalf("decode proof response: %v", err)
+	}
+
+	validRes := performRequest(router, http.MethodPost, "/v1/verify/claim", map[string]any{
+		"did":       "did:uddi:z123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghij",
+		"claimType": "age",
+		"proof":     proofPayload.Proof,
+	}, apiHeaders())
+	if validRes.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", validRes.Code, validRes.Body.String())
+	}
+	assertJSONField(t, validRes.Body.Bytes(), "valid", true)
+
+	invalidRes := performRequest(router, http.MethodPost, "/v1/verify/claim", map[string]any{
+		"did":       "did:uddi:z123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghij",
+		"claimType": "age",
+		"proof": map[string]any{
+			"protocol": "groth16",
+			"curve":    "bn128",
+			"type":     "citizenship",
+			"proof":    map[string]any{},
+		},
+	}, apiHeaders())
+	assertJSONField(t, invalidRes.Body.Bytes(), "valid", false)
+	assertJSONField(t, invalidRes.Body.Bytes(), "reason", "proof type does not match claim type")
 }
 
 func TestCredentialLifecycle(t *testing.T) {
