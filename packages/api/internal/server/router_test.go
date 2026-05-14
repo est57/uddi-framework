@@ -271,6 +271,62 @@ func TestProofGeneration(t *testing.T) {
 	assertNestedJSONField(t, res.Body.Bytes(), []string{"proof", "type"}, "age")
 }
 
+func TestCredentialLifecycle(t *testing.T) {
+	router := newTestRouter(t)
+	issuer := newTestIdentityWithSuffix(t, "issuer123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghij")
+	subject := newTestIdentityWithSuffix(t, "subject12345678ABCDEFGHJKLMNPQRSTUVWXYZabcdefghij")
+	registerDID(t, router, issuer)
+	registerDID(t, router, subject)
+
+	credential := map[string]any{
+		"@context":     []any{"https://www.w3.org/2018/credentials/v1"},
+		"id":           "urn:uddi:vc:test-credential",
+		"type":         []any{"VerifiableCredential", "AgeCredential"},
+		"issuer":       issuer.did,
+		"issuanceDate": time.Now().UTC().Format(time.RFC3339),
+		"credentialSubject": map[string]any{
+			"id":        subject.did,
+			"birthYear": 2000,
+		},
+		"proof": map[string]any{
+			"type":               "Ed25519Signature2020",
+			"verificationMethod": issuer.did + "#keys-1",
+			"proofPurpose":       "assertionMethod",
+			"proofValue":         "signature",
+		},
+	}
+
+	issueRes := performRequest(router, http.MethodPost, "/v1/credentials/issue", map[string]any{
+		"credential": credential,
+	}, apiHeaders())
+	if issueRes.Code != http.StatusCreated {
+		t.Fatalf("expected issue status 201, got %d: %s", issueRes.Code, issueRes.Body.String())
+	}
+	assertJSONField(t, issueRes.Body.Bytes(), "status", "ISSUED")
+
+	listRes := performRequest(router, http.MethodGet, "/v1/credentials/"+subject.did, nil, apiHeaders())
+	if listRes.Code != http.StatusOK {
+		t.Fatalf("expected list status 200, got %d: %s", listRes.Code, listRes.Body.String())
+	}
+	assertNestedJSONField(t, listRes.Body.Bytes(), []string{"credentials", "0", "id"}, "urn:uddi:vc:test-credential")
+
+	verifyRes := performRequest(router, http.MethodGet, "/v1/credentials/urn:uddi:vc:test-credential/verify", nil, apiHeaders())
+	assertJSONField(t, verifyRes.Body.Bytes(), "valid", true)
+
+	revokeRes := performRequest(router, http.MethodPost, "/v1/credentials/revoke", map[string]any{
+		"id":     "urn:uddi:vc:test-credential",
+		"reason": "test revocation",
+	}, apiHeaders())
+	if revokeRes.Code != http.StatusOK {
+		t.Fatalf("expected revoke status 200, got %d: %s", revokeRes.Code, revokeRes.Body.String())
+	}
+	assertJSONField(t, revokeRes.Body.Bytes(), "status", "REVOKED")
+
+	verifyRevokedRes := performRequest(router, http.MethodGet, "/v1/credentials/urn:uddi:vc:test-credential/verify", nil, apiHeaders())
+	assertJSONField(t, verifyRevokedRes.Body.Bytes(), "valid", false)
+	assertJSONField(t, verifyRevokedRes.Body.Bytes(), "reason", "credential revoked")
+}
+
 type testIdentity struct {
 	did        string
 	publicKey  ed25519.PublicKey
@@ -301,13 +357,18 @@ func newTestRouter(t *testing.T) http.Handler {
 
 func newTestIdentity(t *testing.T) testIdentity {
 	t.Helper()
+	return newTestIdentityWithSuffix(t, "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghij")
+}
+
+func newTestIdentityWithSuffix(t *testing.T, suffix string) testIdentity {
+	t.Helper()
 
 	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatalf("generate key: %v", err)
 	}
 	return testIdentity{
-		did:        "did:uddi:z123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghij",
+		did:        "did:uddi:z" + suffix,
 		publicKey:  publicKey,
 		privateKey: privateKey,
 	}
@@ -417,6 +478,15 @@ func assertNestedJSONField(t *testing.T, payload []byte, path []string, expected
 		t.Fatalf("decode json: %v", err)
 	}
 	for _, key := range path {
+		if index, err := strconv.Atoi(key); err == nil {
+			values, ok := value.([]any)
+			if !ok || index >= len(values) {
+				t.Fatalf("expected array index %s in %s", key, string(payload))
+			}
+			value = values[index]
+			continue
+		}
+
 		next, ok := value.(map[string]any)[key]
 		if !ok {
 			t.Fatalf("missing key %s in %s", key, string(payload))

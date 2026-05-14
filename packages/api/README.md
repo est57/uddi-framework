@@ -18,7 +18,8 @@ Implemented today:
 - Redis-backed challenge storage when `UDDI_REDIS_URL` is configured.
 - Service binding and presentation timestamp validation.
 - `DIDStore` abstraction with in-memory and Postgres implementations.
-- Placeholder credential and ZKP endpoints.
+- Credential registry with in-memory and Postgres implementations.
+- ZKP endpoint stubs.
 
 ## Run Checks
 
@@ -53,6 +54,7 @@ Configuration is read from environment variables:
 - `UDDI_GRPC_ADDR`
 - `UDDI_BLOCKCHAIN_RPC`
 - `UDDI_DATABASE_URL`
+- `UDDI_REDIS_URL`
 - `UDDI_ZKP_SERVICE_URL`
 - `UDDI_ALLOWED_ORIGINS`
 

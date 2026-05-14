@@ -13,6 +13,7 @@ Implemented today:
 - `@uddi/sdk` client/verifier SDK surface for identity creation, auth challenges, proof requests, DID resolution, and claim verification calls.
 - Go API gateway with testable router, DID register/resolve/revoke endpoints, API key middleware, auth challenge generation, Ed25519 auth presentation verification, replay protection, and timestamp/service binding checks.
 - DID storage abstraction in the API, with memory and Postgres-backed implementations.
+- Credential registry abstraction in the API, with memory and Postgres-backed implementations.
 - Challenge storage abstraction in the API, with memory and Redis-backed implementations.
 - API key validation with memory and Postgres-backed stores, including seeded development credentials.
 - Circom circuit drafts for age and citizenship verification.
@@ -21,7 +22,7 @@ Implemented today:
 Not implemented yet:
 
 - Substrate/Rust blockchain node and pallets.
-- Persistent credential storage.
+- Full API-side Verifiable Credential cryptographic validation and compliance testing.
 - Production API key management.
 - Real ZKP prover/verifier service runtime.
 - Mobile identity wallet.
@@ -173,10 +174,10 @@ Current REST surface:
 - `GET /v1/did/{did}`
 - `POST /v1/did/revoke`
 - `PUT /v1/did/{did}/update` - placeholder
-- `GET /v1/credentials/{did}` - API key required, placeholder registry
-- `POST /v1/credentials/issue` - API key required, placeholder
-- `POST /v1/credentials/revoke` - API key required, placeholder
-- `GET /v1/credentials/{id}/verify` - API key required, placeholder
+- `GET /v1/credentials/{did}` - API key required
+- `POST /v1/credentials/issue` - API key required
+- `POST /v1/credentials/revoke` - API key required
+- `GET /v1/credentials/{id}/verify` - API key required
 - `POST /v1/verify/challenge` - API key required
 - `POST /v1/verify/auth` - API key required
 - `POST /v1/verify/claim` - API key required, ZKP stub
@@ -287,7 +288,7 @@ When `UDDI_DATABASE_URL` is configured, the API persists DID registry and API ke
 | DID registry | Memory store | Postgres `dids` table |
 | API keys | Memory seeded keys | Postgres `api_keys` table |
 | Auth challenges | Memory store | Redis with TTL |
-| Credential registry | Placeholder | Roadmap |
+| Credential registry | Memory store | Postgres `credentials` table |
 | ZKP verification | Stub/circuit drafts | Roadmap service |
 
 ## Sequence Diagrams
@@ -415,7 +416,7 @@ sequenceDiagram
 ## Roadmap
 
 - Replace in-memory blockchain client with real registry integration.
-- Implement real credential issuance and verification endpoints.
+- Add full API-side cryptographic VC verification and DID/VC compliance coverage.
 - Build ZKP prover/verifier service around the existing circuits.
 - Add compliance tests for DID and Verifiable Credentials.
 - Add mobile wallet/holder application.

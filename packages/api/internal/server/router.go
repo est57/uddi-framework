@@ -26,8 +26,12 @@ func NewRouter(cfg *config.Config, chainClient *blockchain.Client, zkpService *z
 	if err != nil {
 		return nil, err
 	}
+	credentialStore, err := newCredentialStore(cfg)
+	if err != nil {
+		return nil, err
+	}
 	verifyHandler := handlers.NewVerifyHandlerWithChallengeStore(chainClient, zkpService, challengeStore)
-	credHandler := handlers.NewCredentialHandler(chainClient)
+	credHandler := handlers.NewCredentialHandler(chainClient, credentialStore)
 	proofHandler := handlers.NewProofHandler(zkpService, chainClient)
 
 	r := chi.NewRouter()
@@ -108,6 +112,21 @@ func newChallengeStore(cfg *config.Config) (handlers.ChallengeStore, error) {
 	store, err := handlers.NewRedisChallengeStore(cfg.RedisURL)
 	if err != nil {
 		return nil, fmt.Errorf("create Redis challenge store: %w", err)
+	}
+	return store, nil
+}
+
+func newCredentialStore(cfg *config.Config) (handlers.CredentialStore, error) {
+	if cfg.DatabaseURL == "" {
+		return handlers.NewMemoryCredentialStore(), nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := handlers.NewPostgresCredentialStore(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("create Postgres credential store: %w", err)
 	}
 	return store, nil
 }

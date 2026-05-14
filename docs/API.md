@@ -244,7 +244,7 @@ Invalid presentations still return `200` with `valid: false`:
 
 ## Credential Endpoints
 
-These endpoints are protected by API key middleware. The registry behavior is still placeholder-level in the alpha API.
+These endpoints are protected by API key middleware. The API stores already-issued credentials as registry records. Issuer-side signing is still performed outside the API, for example by `@uddi/core`.
 
 ### `GET /v1/credentials/{did}`
 
@@ -259,27 +259,105 @@ Response:
 ```json
 {
   "did": "did:uddi:zExampleIdentifierWithAtLeastFortyCharacters123",
-  "credentials": []
+  "credentials": [
+    {
+      "id": "urn:uddi:vc:example",
+      "issuer": "did:uddi:zIssuerIdentifierWithAtLeastFortyCharacters123",
+      "subject": "did:uddi:zExampleIdentifierWithAtLeastFortyCharacters123",
+      "types": ["VerifiableCredential", "AgeCredential"],
+      "credential": {
+        "@context": ["https://www.w3.org/2018/credentials/v1"],
+        "id": "urn:uddi:vc:example",
+        "type": ["VerifiableCredential", "AgeCredential"],
+        "issuer": "did:uddi:zIssuerIdentifierWithAtLeastFortyCharacters123",
+        "issuanceDate": "2026-05-14T04:00:00Z",
+        "credentialSubject": {
+          "id": "did:uddi:zExampleIdentifierWithAtLeastFortyCharacters123",
+          "birthYear": 2000
+        },
+        "proof": {
+          "type": "Ed25519Signature2020",
+          "verificationMethod": "did:uddi:zIssuerIdentifierWithAtLeastFortyCharacters123#keys-1",
+          "proofPurpose": "assertionMethod",
+          "proofValue": "BASE64_SIGNATURE"
+        }
+      },
+      "issuanceDate": "2026-05-14T04:00:00Z",
+      "createdAt": "2026-05-14T04:00:01Z"
+    }
+  ]
 }
 ```
 
 ### `POST /v1/credentials/issue`
 
-Response `202`:
+Stores a signed Verifiable Credential in the registry. The credential issuer DID and subject DID must already exist in the DID registry.
+
+Request:
+
+```bash
+curl -X POST http://localhost:8080/v1/credentials/issue \
+  -H 'Content-Type: application/json' \
+  -H 'X-Service-ID: dev-service' \
+  -H 'X-API-Key: dev-api-key' \
+  -d '{
+    "credential": {
+      "@context": ["https://www.w3.org/2018/credentials/v1"],
+      "id": "urn:uddi:vc:example",
+      "type": ["VerifiableCredential", "AgeCredential"],
+      "issuer": "did:uddi:zIssuerIdentifierWithAtLeastFortyCharacters123",
+      "issuanceDate": "2026-05-14T04:00:00Z",
+      "credentialSubject": {
+        "id": "did:uddi:zExampleIdentifierWithAtLeastFortyCharacters123",
+        "birthYear": 2000
+      },
+      "proof": {
+        "type": "Ed25519Signature2020",
+        "verificationMethod": "did:uddi:zIssuerIdentifierWithAtLeastFortyCharacters123#keys-1",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "BASE64_SIGNATURE"
+      }
+    }
+  }'
+```
+
+Response `201`:
 
 ```json
 {
-  "status": "PENDING_IMPLEMENTATION"
+  "status": "ISSUED",
+  "credential": {
+    "id": "urn:uddi:vc:example",
+    "issuer": "did:uddi:zIssuerIdentifierWithAtLeastFortyCharacters123",
+    "subject": "did:uddi:zExampleIdentifierWithAtLeastFortyCharacters123",
+    "types": ["VerifiableCredential", "AgeCredential"],
+    "issuanceDate": "2026-05-14T04:00:00Z",
+    "createdAt": "2026-05-14T04:00:01Z"
+  }
 }
 ```
 
 ### `POST /v1/credentials/revoke`
 
-Response `202`:
+Request:
+
+```bash
+curl -X POST http://localhost:8080/v1/credentials/revoke \
+  -H 'Content-Type: application/json' \
+  -H 'X-Service-ID: dev-service' \
+  -H 'X-API-Key: dev-api-key' \
+  -d '{
+    "id": "urn:uddi:vc:example",
+    "reason": "issuer requested revocation"
+  }'
+```
+
+Response:
 
 ```json
 {
-  "status": "PENDING_IMPLEMENTATION"
+  "status": "REVOKED",
+  "id": "urn:uddi:vc:example"
 }
 ```
 
@@ -289,9 +367,13 @@ Response:
 
 ```json
 {
-  "id": "credential-id",
-  "valid": false,
-  "reason": "credential registry not implemented yet"
+  "id": "urn:uddi:vc:example",
+  "valid": true,
+  "reason": "",
+  "issuer": "did:uddi:zIssuerIdentifierWithAtLeastFortyCharacters123",
+  "subject": "did:uddi:zExampleIdentifierWithAtLeastFortyCharacters123",
+  "types": ["VerifiableCredential", "AgeCredential"],
+  "verifiedAt": "2026-05-14T04:00:02Z"
 }
 ```
 
