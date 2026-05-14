@@ -153,6 +153,12 @@ pnpm example:auth-flow
 
 ## SDK Example
 
+Install the published TypeScript packages:
+
+```bash
+pnpm add @uddi/core @uddi/sdk
+```
+
 User/holder side:
 
 ```typescript
