@@ -76,3 +76,25 @@ func (c *Client) RevokeDID(ctx context.Context, did string) error {
 	doc.Deactivated = true
 	return c.store.Update(ctx, *doc)
 }
+
+func (c *Client) RegistryStats(ctx context.Context) (RegistryStats, error) {
+	stats, err := c.store.Stats(ctx)
+	if err != nil {
+		return RegistryStats{}, err
+	}
+	stats.Backend = registryBackend(c.rpc, stats.Backend)
+	return stats, nil
+}
+
+func registryBackend(rpc string, fallback string) string {
+	switch {
+	case rpc == "":
+		return fallback
+	case rpc == "memory://local", rpc == "memory://test":
+		return fallback
+	case fallback != "":
+		return fallback
+	default:
+		return rpc
+	}
+}

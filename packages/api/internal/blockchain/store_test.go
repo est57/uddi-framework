@@ -50,6 +50,17 @@ func TestMemoryDIDStoreLifecycle(t *testing.T) {
 	if !updated.Deactivated {
 		t.Fatal("expected DID to be deactivated")
 	}
+
+	stats, err := store.Stats(ctx)
+	if err != nil {
+		t.Fatalf("stats: %v", err)
+	}
+	if stats.TotalDIDs != 1 || stats.ActiveDIDs != 0 || stats.DeactivatedDIDs != 1 {
+		t.Fatalf("unexpected stats: %+v", stats)
+	}
+	if stats.Backend != "memory" {
+		t.Fatalf("expected memory backend, got %s", stats.Backend)
+	}
 }
 
 func TestMemoryDIDStoreReturnsNotFound(t *testing.T) {
@@ -95,5 +106,13 @@ func TestClientUsesStore(t *testing.T) {
 	}
 	if !doc.Deactivated {
 		t.Fatal("expected DID to be deactivated")
+	}
+
+	stats, err := client.RegistryStats(ctx)
+	if err != nil {
+		t.Fatalf("registry stats: %v", err)
+	}
+	if stats.TotalDIDs != 1 || stats.DeactivatedDIDs != 1 {
+		t.Fatalf("unexpected registry stats: %+v", stats)
 	}
 }

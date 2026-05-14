@@ -98,3 +98,19 @@ func (s *PostgresDIDStore) Update(ctx context.Context, doc DIDDocument) error {
 	}
 	return nil
 }
+
+func (s *PostgresDIDStore) Stats(ctx context.Context) (RegistryStats, error) {
+	var stats RegistryStats
+	err := s.db.QueryRowContext(ctx, `
+		SELECT
+			COUNT(*),
+			COUNT(*) FILTER (WHERE deactivated = false),
+			COUNT(*) FILTER (WHERE deactivated = true)
+		FROM dids
+	`).Scan(&stats.TotalDIDs, &stats.ActiveDIDs, &stats.DeactivatedDIDs)
+	if err != nil {
+		return RegistryStats{}, err
+	}
+	stats.Backend = "postgres"
+	return stats, nil
+}

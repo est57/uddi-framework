@@ -599,7 +599,8 @@ Response:
 ```json
 {
   "totalDIDs": 0,
-  "activeCredentials": 0,
-  "revokedCredentials": 0
+  "activeDIDs": 0,
+  "deactivatedDIDs": 0,
+  "backend": "memory"
 }
 ```

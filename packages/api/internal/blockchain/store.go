@@ -11,6 +11,14 @@ type DIDStore interface {
 	Create(ctx context.Context, doc DIDDocument) error
 	Resolve(ctx context.Context, did string) (*DIDDocument, error)
 	Update(ctx context.Context, doc DIDDocument) error
+	Stats(ctx context.Context) (RegistryStats, error)
+}
+
+type RegistryStats struct {
+	TotalDIDs       int64  `json:"totalDIDs"`
+	ActiveDIDs      int64  `json:"activeDIDs"`
+	DeactivatedDIDs int64  `json:"deactivatedDIDs"`
+	Backend         string `json:"backend"`
 }
 
 type MemoryDIDStore struct {
@@ -57,4 +65,20 @@ func (s *MemoryDIDStore) Update(_ context.Context, doc DIDDocument) error {
 	doc.Updated = time.Now().UTC().Format(time.RFC3339)
 	s.dids[doc.ID] = doc
 	return nil
+}
+
+func (s *MemoryDIDStore) Stats(_ context.Context) (RegistryStats, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	stats := RegistryStats{Backend: "memory"}
+	for _, doc := range s.dids {
+		stats.TotalDIDs++
+		if doc.Deactivated {
+			stats.DeactivatedDIDs++
+			continue
+		}
+		stats.ActiveDIDs++
+	}
+	return stats, nil
 }

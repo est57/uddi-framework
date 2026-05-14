@@ -34,6 +34,7 @@ func NewRouter(cfg *config.Config, chainClient *blockchain.Client, zkpService *z
 	credHandler := handlers.NewCredentialHandler(chainClient, credentialStore)
 	apiKeyHandler := handlers.NewAPIKeyHandler(apiKeyStore)
 	proofHandler := handlers.NewProofHandler(zkpService, chainClient)
+	registryHandler := handlers.NewRegistryHandler(chainClient)
 
 	r := chi.NewRouter()
 	metrics := middleware.NewMetrics()
@@ -99,10 +100,7 @@ func NewRouter(cfg *config.Config, chainClient *blockchain.Client, zkpService *z
 			r.Post("/generate", proofHandler.Generate)
 		})
 
-		r.Get("/registry/stats", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"totalDIDs":0,"totalCredentials":0,"activeNodes":0}`))
-		})
+		r.Get("/registry/stats", registryHandler.Stats)
 	})
 
 	return r, nil

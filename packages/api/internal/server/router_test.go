@@ -50,6 +50,20 @@ func TestReadinessAndMetrics(t *testing.T) {
 	assertJSONNumberAtLeast(t, metricsRes.Body.Bytes(), "requestsTotal", 2)
 }
 
+func TestRegistryStatsUsesDIDStoreState(t *testing.T) {
+	router := newTestRouter(t)
+	identity := newTestIdentityWithSuffix(t, "stats123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghij")
+	registerDID(t, router, identity)
+
+	statsRes := performRequest(router, http.MethodGet, "/v1/registry/stats", nil, nil)
+	if statsRes.Code != http.StatusOK {
+		t.Fatalf("expected stats status 200, got %d: %s", statsRes.Code, statsRes.Body.String())
+	}
+	assertJSONNumberAtLeast(t, statsRes.Body.Bytes(), "totalDIDs", 1)
+	assertJSONNumberAtLeast(t, statsRes.Body.Bytes(), "activeDIDs", 1)
+	assertJSONField(t, statsRes.Body.Bytes(), "backend", "memory")
+}
+
 func TestAPIKeyMiddleware(t *testing.T) {
 	router := newTestRouter(t)
 

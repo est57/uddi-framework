@@ -66,6 +66,17 @@ func TestPostgresDIDStoreLifecycle(t *testing.T) {
 	if !updated.Deactivated {
 		t.Fatal("expected DID to be deactivated")
 	}
+
+	stats, err := store.Stats(ctx)
+	if err != nil {
+		t.Fatalf("stats: %v", err)
+	}
+	if stats.TotalDIDs < 1 {
+		t.Fatalf("expected at least one DID, got %+v", stats)
+	}
+	if stats.Backend != "postgres" {
+		t.Fatalf("expected postgres backend, got %s", stats.Backend)
+	}
 }
 
 func TestPostgresDIDStoreNotFound(t *testing.T) {
