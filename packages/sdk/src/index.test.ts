@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generateIdentity } from '@uddi/core/identity';
-import type { UddiIdentity } from '@uddi/core/types';
+import type { UddiIdentity, VerifiableCredential } from '@uddi/core/types';
 import { UddiClient, UddiVerifier, type IdentityStorage } from './index';
 
 function mockFetch(payload: unknown = {}) {
@@ -159,4 +159,106 @@ describe('UddiVerifier', () => {
     })).rejects.toThrow('Invalid DID format');
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it('submits signed credentials with API key headers', async () => {
+    const credential = sampleCredential();
+    const fetchMock = mockFetch({
+      status: 'ISSUED',
+      credential: {
+        id: credential.id,
+        issuer: credential.issuer,
+        subject: credential.credentialSubject.id,
+        types: credential.type,
+        credential,
+        issuanceDate: credential.issuanceDate,
+        createdAt: new Date().toISOString(),
+      },
+    });
+    const verifier = new UddiVerifier({
+      network: 'local',
+      serviceId: 'service-1',
+      apiKey: 'secret',
+    });
+
+    const record = await verifier.submitCredential(credential);
+
+    expect(record.id).toBe(credential.id);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('http://localhost:8080/v1/credentials/issue');
+    expect(fetchMock.mock.calls[0]?.[1]?.headers).toMatchObject({
+      'X-API-Key': 'secret',
+      'X-Service-ID': 'service-1',
+    });
+    const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(request.credential).toEqual(credential);
+  });
+
+  it('lists, verifies, and revokes credential registry records', async () => {
+    const credential = sampleCredential();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith(`/v1/credentials/${credential.credentialSubject.id}`)) {
+        return jsonResponse({ did: credential.credentialSubject.id, credentials: [{ id: credential.id }] });
+      }
+      if (url.endsWith(`/v1/credentials/${encodeURIComponent(credential.id)}/verify`)) {
+        return jsonResponse({
+          id: credential.id,
+          valid: true,
+          reason: '',
+          verifiedAt: new Date().toISOString(),
+        });
+      }
+      if (url.endsWith('/v1/credentials/revoke')) {
+        return jsonResponse({ status: 'REVOKED', id: credential.id });
+      }
+      return jsonResponse({ error: 'not found' }, 404);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const verifier = new UddiVerifier({
+      network: 'local',
+      serviceId: 'service-1',
+      apiKey: 'secret',
+    });
+
+    await expect(verifier.listCredentials(credential.credentialSubject.id)).resolves.toHaveLength(1);
+    await expect(verifier.verifyCredentialStatus(credential.id)).resolves.toMatchObject({
+      id: credential.id,
+      valid: true,
+    });
+    await expect(verifier.revokeCredential(credential.id, 'test')).resolves.toEqual({
+      status: 'REVOKED',
+      id: credential.id,
+    });
+
+    expect(fetchMock.mock.calls[2]?.[0]).toBe('http://localhost:8080/v1/credentials/revoke');
+    const revokeBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body));
+    expect(revokeBody).toEqual({ id: credential.id, reason: 'test' });
+  });
 });
+
+function jsonResponse(payload: unknown, status = 200): Response {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+function sampleCredential(): VerifiableCredential<{ birthYear: number }> {
+  return {
+    '@context': ['https://www.w3.org/2018/credentials/v1'],
+    id: 'urn:uddi:vc:sample',
+    type: ['VerifiableCredential', 'AgeCredential'],
+    issuer: 'did:uddi:zissuer123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghij',
+    issuanceDate: '2026-05-14T00:00:00Z',
+    credentialSubject: {
+      id: 'did:uddi:zsubject12345678ABCDEFGHJKLMNPQRSTUVWXYZabcdefghij',
+      birthYear: 2000,
+    },
+    proof: {
+      type: 'Ed25519Signature2020',
+      created: '2026-05-14T00:00:00Z',
+      verificationMethod: 'did:uddi:zissuer123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghij#keys-1',
+      proofPurpose: 'assertionMethod',
+      proofValue: 'signature',
+    },
+  };
+}

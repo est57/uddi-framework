@@ -246,6 +246,29 @@ export interface UddiVerifierConfig extends NetworkConfig {
   serviceName?: string;
 }
 
+export interface CredentialRegistryRecord<T extends object = Record<string, unknown>> {
+  id: string;
+  issuer: Did;
+  subject: Did;
+  types: string[];
+  credential: VerifiableCredential<T>;
+  issuanceDate: string;
+  expirationDate?: string;
+  createdAt: string;
+  revokedAt?: string;
+  revocationReason?: string;
+}
+
+export interface CredentialStatusResult {
+  id: string;
+  valid: boolean;
+  reason?: string;
+  issuer?: Did;
+  subject?: Did;
+  types?: string[];
+  verifiedAt: string;
+}
+
 /**
  * UddiVerifier — used by app developers to verify UDDI identities
  *
@@ -355,6 +378,55 @@ export class UddiVerifier {
     });
 
     return response as unknown as ProofVerificationResult;
+  }
+
+  /**
+   * Store a signed Verifiable Credential in the registry.
+   *
+   * The issuer and subject DIDs must already be registered. The API verifies the
+   * credential proof before storing it.
+   */
+  async submitCredential<T extends object>(
+    credential: VerifiableCredential<T>,
+  ): Promise<CredentialRegistryRecord<T>> {
+    const response = await this.post('/v1/credentials/issue', { credential });
+    return response.credential as CredentialRegistryRecord<T>;
+  }
+
+  /**
+   * List credentials stored for a DID.
+   */
+  async listCredentials(did: Did): Promise<CredentialRegistryRecord[]> {
+    if (!isValidDid(did)) {
+      throw new Error(`Invalid DID format: ${did}`);
+    }
+
+    const response = await this.get(`/v1/credentials/${did}`);
+    return response.credentials as CredentialRegistryRecord[];
+  }
+
+  /**
+   * Check registry status, expiry, revocation, and proof validity for a credential.
+   */
+  async verifyCredentialStatus(id: string): Promise<CredentialStatusResult> {
+    if (!id) {
+      throw new Error('Credential id is required');
+    }
+
+    const response = await this.get(`/v1/credentials/${encodeURIComponent(id)}/verify`);
+    return response as unknown as CredentialStatusResult;
+  }
+
+  /**
+   * Revoke a credential in the registry.
+   */
+  async revokeCredential(id: string, reason?: string): Promise<{ status: 'REVOKED'; id: string }> {
+    if (!id) {
+      throw new Error('Credential id is required');
+    }
+
+    const response = await this.post('/v1/credentials/revoke', { id, reason });
+    return response as { status: 'REVOKED'; id: string };
   }
 
   /**

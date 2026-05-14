@@ -23,6 +23,7 @@ pnpm add @uddi/sdk
 - Create auth challenges.
 - Verify auth presentations.
 - Verify ZK claim payloads through the API.
+- Submit, list, verify, and revoke credential registry records.
 
 ## Build And Test
 
@@ -53,6 +54,17 @@ const presentation = await client.authenticate(challenge);
 const result = await verifier.verifyAuth(challenge.challengeId, presentation);
 
 console.log(did, result.valid);
+```
+
+## Credential Registry
+
+Credential registry endpoints require service API credentials, so they are exposed on `UddiVerifier`:
+
+```typescript
+const record = await verifier.submitCredential(signedCredential);
+const credentials = await verifier.listCredentials(did);
+const status = await verifier.verifyCredentialStatus(record.id);
+await verifier.revokeCredential(record.id, 'issuer requested revocation');
 ```
 
 ## Notes
