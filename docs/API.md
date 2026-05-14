@@ -195,13 +195,37 @@ Response:
 
 ### `PUT /v1/did/{did}/update`
 
-This endpoint exists but is not implemented yet.
+Rotates the DID public key and optionally updates the DID document context. The request must be signed by the DID's current public key over:
 
-Response `501`:
+```text
+update:{did}:{newPublicKeyBase64}:{timestamp}
+```
+
+Request:
+
+```bash
+curl -X PUT 'http://localhost:8080/v1/did/did:uddi:zExampleIdentifierWithAtLeastFortyCharacters123/update' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "did": "did:uddi:zExampleIdentifierWithAtLeastFortyCharacters123",
+    "publicKeyBase64": "BASE64_NEW_ED25519_PUBLIC_KEY",
+    "context": [
+      "https://www.w3.org/ns/did/v1",
+      "https://uddi.network/v1"
+    ],
+    "signatureBase64": "BASE64_SIGNATURE_FROM_CURRENT_KEY",
+    "timestamp": "2026-05-14T04:20:00Z"
+  }'
+```
+
+Response:
 
 ```json
 {
-  "error": "DID update not yet implemented"
+  "did": "did:uddi:zExampleIdentifierWithAtLeastFortyCharacters123",
+  "txHash": "0x...",
+  "status": "UPDATED",
+  "updatedAt": "2026-05-14T04:20:00Z"
 }
 ```
 

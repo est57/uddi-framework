@@ -168,6 +168,7 @@ func TestRateLimit(t *testing.T) {
 func TestDIDLifecycle(t *testing.T) {
 	router := newTestRouter(t)
 	identity := newTestIdentity(t)
+	updatedIdentity := newTestIdentityWithSuffix(t, "updated123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghij")
 
 	registerRes := registerDID(t, router, identity)
 	if registerRes.Code != http.StatusCreated {
@@ -180,10 +181,27 @@ func TestDIDLifecycle(t *testing.T) {
 	}
 	assertNestedJSONField(t, resolveRes.Body.Bytes(), []string{"didDocument", "id"}, identity.did)
 
+	updateTimestamp := "1700000000002"
+	updatedPublicKey := base64.StdEncoding.EncodeToString(updatedIdentity.publicKey)
+	updateRes := performRequest(router, http.MethodPut, "/v1/did/"+identity.did+"/update", map[string]any{
+		"did":             identity.did,
+		"publicKeyBase64": updatedPublicKey,
+		"context":         []string{"https://www.w3.org/ns/did/v1", "https://uddi.network/v1"},
+		"signatureBase64": signBase64(t, identity.privateKey, "update:"+identity.did+":"+updatedPublicKey+":"+updateTimestamp),
+		"timestamp":       updateTimestamp,
+	}, nil)
+	if updateRes.Code != http.StatusOK {
+		t.Fatalf("expected update status 200, got %d: %s", updateRes.Code, updateRes.Body.String())
+	}
+	assertJSONField(t, updateRes.Body.Bytes(), "status", "UPDATED")
+
+	resolveUpdatedRes := performRequest(router, http.MethodGet, "/v1/did/"+identity.did, nil, nil)
+	assertNestedJSONField(t, resolveUpdatedRes.Body.Bytes(), []string{"didDocument", "publicKeyBase64"}, updatedPublicKey)
+
 	revokeTimestamp := "1700000000001"
 	revokeBody := map[string]any{
 		"did":             identity.did,
-		"signatureBase64": signBase64(t, identity.privateKey, "revoke:"+identity.did+":"+revokeTimestamp),
+		"signatureBase64": signBase64(t, updatedIdentity.privateKey, "revoke:"+identity.did+":"+revokeTimestamp),
 		"timestamp":       revokeTimestamp,
 	}
 	revokeRes := performRequest(router, http.MethodPost, "/v1/did/revoke", revokeBody, nil)
@@ -193,6 +211,58 @@ func TestDIDLifecycle(t *testing.T) {
 
 	resolveRevokedRes := performRequest(router, http.MethodGet, "/v1/did/"+identity.did, nil, nil)
 	assertNestedJSONField(t, resolveRevokedRes.Body.Bytes(), []string{"didDocument", "deactivated"}, true)
+}
+
+func TestDIDUpdateRejectsInvalidRequests(t *testing.T) {
+	router := newTestRouter(t)
+	identity := newTestIdentity(t)
+	newIdentity := newTestIdentityWithSuffix(t, "newkey123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghij")
+	registerDID(t, router, identity)
+
+	timestamp := "1700000000003"
+	newPublicKey := base64.StdEncoding.EncodeToString(newIdentity.publicKey)
+
+	mismatchRes := performRequest(router, http.MethodPut, "/v1/did/"+identity.did+"/update", map[string]any{
+		"did":             newIdentity.did,
+		"publicKeyBase64": newPublicKey,
+		"signatureBase64": signBase64(t, identity.privateKey, "update:"+identity.did+":"+newPublicKey+":"+timestamp),
+		"timestamp":       timestamp,
+	}, nil)
+	if mismatchRes.Code != http.StatusBadRequest {
+		t.Fatalf("expected mismatch status 400, got %d: %s", mismatchRes.Code, mismatchRes.Body.String())
+	}
+
+	wrongSignatureRes := performRequest(router, http.MethodPut, "/v1/did/"+identity.did+"/update", map[string]any{
+		"did":             identity.did,
+		"publicKeyBase64": newPublicKey,
+		"signatureBase64": signBase64(t, newIdentity.privateKey, "update:"+identity.did+":"+newPublicKey+":"+timestamp),
+		"timestamp":       timestamp,
+	}, nil)
+	if wrongSignatureRes.Code != http.StatusUnauthorized {
+		t.Fatalf("expected wrong signature status 401, got %d: %s", wrongSignatureRes.Code, wrongSignatureRes.Body.String())
+	}
+	assertJSONField(t, wrongSignatureRes.Body.Bytes(), "error", "signature verification failed")
+
+	revokeTimestamp := "1700000000004"
+	revokeRes := performRequest(router, http.MethodPost, "/v1/did/revoke", map[string]any{
+		"did":             identity.did,
+		"signatureBase64": signBase64(t, identity.privateKey, "revoke:"+identity.did+":"+revokeTimestamp),
+		"timestamp":       revokeTimestamp,
+	}, nil)
+	if revokeRes.Code != http.StatusOK {
+		t.Fatalf("expected revoke status 200, got %d: %s", revokeRes.Code, revokeRes.Body.String())
+	}
+
+	deactivatedRes := performRequest(router, http.MethodPut, "/v1/did/"+identity.did+"/update", map[string]any{
+		"did":             identity.did,
+		"publicKeyBase64": newPublicKey,
+		"signatureBase64": signBase64(t, identity.privateKey, "update:"+identity.did+":"+newPublicKey+":"+timestamp),
+		"timestamp":       timestamp,
+	}, nil)
+	if deactivatedRes.Code != http.StatusConflict {
+		t.Fatalf("expected deactivated status 409, got %d: %s", deactivatedRes.Code, deactivatedRes.Body.String())
+	}
+	assertJSONField(t, deactivatedRes.Body.Bytes(), "error", "DID is deactivated")
 }
 
 func TestAuthChallengeAndVerification(t *testing.T) {

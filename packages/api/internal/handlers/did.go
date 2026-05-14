@@ -173,7 +173,78 @@ func (h *DIDHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *DIDHandler) Update(w http.ResponseWriter, r *http.Request) {
-	response.Error(w, http.StatusNotImplemented, "DID update not yet implemented")
+	did := chi.URLParam(r, "did")
+	var req struct {
+		DID             string   `json:"did"`
+		PublicKeyBase64 string   `json:"publicKeyBase64"`
+		Context         []string `json:"context"`
+		SignatureBase64 string   `json:"signatureBase64"`
+		Timestamp       string   `json:"timestamp"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.Error(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.DID == "" {
+		req.DID = did
+	}
+	if did != req.DID {
+		response.Error(w, http.StatusBadRequest, "DID path and body mismatch")
+		return
+	}
+	if !isValidDID(req.DID) {
+		response.Error(w, http.StatusBadRequest, "invalid DID format")
+		return
+	}
+
+	didDoc, err := h.chain.ResolveDID(r.Context(), req.DID)
+	if err != nil {
+		response.Error(w, http.StatusNotFound, "DID not found")
+		return
+	}
+	if didDoc.Deactivated {
+		response.Error(w, http.StatusConflict, "DID is deactivated")
+		return
+	}
+
+	currentPubKeyBytes, err := base64.StdEncoding.DecodeString(didDoc.PublicKeyBase64)
+	if err != nil || len(currentPubKeyBytes) != ed25519.PublicKeySize {
+		response.Error(w, http.StatusInternalServerError, "invalid stored public key")
+		return
+	}
+	newPubKeyBytes, err := base64.StdEncoding.DecodeString(req.PublicKeyBase64)
+	if err != nil || len(newPubKeyBytes) != ed25519.PublicKeySize {
+		response.Error(w, http.StatusBadRequest, "invalid public key")
+		return
+	}
+
+	challenge := []byte("update:" + req.DID + ":" + req.PublicKeyBase64 + ":" + req.Timestamp)
+	sigBytes, err := base64.StdEncoding.DecodeString(req.SignatureBase64)
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "invalid signature encoding")
+		return
+	}
+	if !ed25519.Verify(currentPubKeyBytes, challenge, sigBytes) {
+		response.Error(w, http.StatusUnauthorized, "signature verification failed")
+		return
+	}
+
+	txHash, err := h.chain.UpdateDID(r.Context(), blockchain.UpdateDIDParams{
+		DID:       req.DID,
+		PublicKey: newPubKeyBytes,
+		Context:   req.Context,
+	})
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DID update failed")
+		return
+	}
+
+	response.JSON(w, http.StatusOK, map[string]any{
+		"did":       req.DID,
+		"txHash":    txHash,
+		"status":    "UPDATED",
+		"updatedAt": time.Now().UTC().Format(time.RFC3339),
+	})
 }
 
 func isValidDID(did string) bool {

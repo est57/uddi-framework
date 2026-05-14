@@ -10,6 +10,7 @@ import (
 )
 
 var ErrDIDNotFound = errors.New("did not found")
+var ErrDIDDeactivated = errors.New("did deactivated")
 
 type Client struct {
 	rpc   string
@@ -19,6 +20,12 @@ type Client struct {
 type RegisterDIDParams struct {
 	DID       string
 	PublicKey []byte
+}
+
+type UpdateDIDParams struct {
+	DID       string
+	PublicKey []byte
+	Context   []string
 }
 
 type DIDDocument struct {
@@ -75,6 +82,30 @@ func (c *Client) RevokeDID(ctx context.Context, did string) error {
 	}
 	doc.Deactivated = true
 	return c.store.Update(ctx, *doc)
+}
+
+func (c *Client) UpdateDID(ctx context.Context, params UpdateDIDParams) (string, error) {
+	doc, err := c.store.Resolve(ctx, params.DID)
+	if err != nil {
+		return "", err
+	}
+	if doc.Deactivated {
+		return "", ErrDIDDeactivated
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	if len(params.Context) > 0 {
+		doc.Context = params.Context
+	}
+	doc.PublicKeyBase64 = base64.StdEncoding.EncodeToString(params.PublicKey)
+	doc.Updated = now
+
+	if err := c.store.Update(ctx, *doc); err != nil {
+		return "", err
+	}
+
+	hash := sha256.Sum256([]byte(c.rpc + ":" + params.DID + ":update:" + now))
+	return "0x" + hex.EncodeToString(hash[:]), nil
 }
 
 func (c *Client) RegistryStats(ctx context.Context) (RegistryStats, error) {

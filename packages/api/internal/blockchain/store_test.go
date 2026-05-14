@@ -116,3 +116,40 @@ func TestClientUsesStore(t *testing.T) {
 		t.Fatalf("unexpected registry stats: %+v", stats)
 	}
 }
+
+func TestClientUpdatesDID(t *testing.T) {
+	ctx := context.Background()
+	client := NewClientWithStore("memory://test", NewMemoryDIDStore())
+	did := "did:uddi:zupdate123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdef"
+
+	_, err := client.RegisterDID(ctx, RegisterDIDParams{
+		DID:       did,
+		PublicKey: []byte("old-public-key"),
+	})
+	if err != nil {
+		t.Fatalf("register DID: %v", err)
+	}
+
+	txHash, err := client.UpdateDID(ctx, UpdateDIDParams{
+		DID:       did,
+		PublicKey: []byte("new-public-key"),
+		Context:   []string{"https://www.w3.org/ns/did/v1", "https://uddi.network/v1"},
+	})
+	if err != nil {
+		t.Fatalf("update DID: %v", err)
+	}
+	if txHash == "" {
+		t.Fatal("expected update tx hash")
+	}
+
+	doc, err := client.ResolveDID(ctx, did)
+	if err != nil {
+		t.Fatalf("resolve DID: %v", err)
+	}
+	if doc.PublicKeyBase64 != base64.StdEncoding.EncodeToString([]byte("new-public-key")) {
+		t.Fatalf("expected updated public key, got %s", doc.PublicKeyBase64)
+	}
+	if len(doc.Context) != 2 {
+		t.Fatalf("expected updated DID context, got %+v", doc.Context)
+	}
+}

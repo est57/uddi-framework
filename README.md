@@ -208,7 +208,7 @@ Current REST surface:
 - `POST /v1/did/register`
 - `GET /v1/did/{did}`
 - `POST /v1/did/revoke`
-- `PUT /v1/did/{did}/update` - placeholder
+- `PUT /v1/did/{did}/update`
 - `GET /v1/credentials/{did}` - API key required
 - `POST /v1/credentials/issue` - API key required
 - `POST /v1/credentials/revoke` - API key required
