@@ -80,6 +80,15 @@ Preview npm package contents:
 pnpm pack:dry-run
 ```
 
+Create a release candidate tag:
+
+```bash
+git tag v0.1.0-alpha.1
+git push origin v0.1.0-alpha.1
+```
+
+Release tags run GitHub validation and create a draft GitHub Release.
+
 Run Go API checks:
 
 ```bash

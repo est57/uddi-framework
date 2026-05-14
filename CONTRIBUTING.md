@@ -54,7 +54,7 @@ Check the [good first issue](https://github.com/uddi-protocol/uddi/labels/good%2
 
 | Tool | Version | Used for |
 |------|---------|----------|
-| Node.js | ≥ 18 | TypeScript packages |
+| Node.js | ≥ 22.13 | TypeScript packages |
 | pnpm | 11.1.1 | Package manager |
 | Go | 1.25.x | API Gateway |
 | Rust | stable | Planned blockchain node |
