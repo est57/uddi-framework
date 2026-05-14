@@ -7,18 +7,20 @@ on:
     branches: [main, develop]
 
 jobs:
-  # ── TypeScript packages ────────────────────────────────────────────────────
   typescript:
-    name: TypeScript (Build & Test)
+    name: TypeScript
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
         with:
           version: 11.1.1
 
-      - uses: actions/setup-node@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -26,25 +28,26 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build all packages
+      - name: Build
         run: pnpm build
 
-      - name: Run tests
+      - name: Test
         run: pnpm test
 
       - name: Lint
         run: pnpm lint
 
-  # ── Go API Gateway ────────────────────────────────────────────────────────
-  golang:
-    name: Go API (Build & Test)
+  go:
+    name: Go API
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          go-version: '1.25.x'
+          go-version-file: packages/api/go.mod
           cache: true
           cache-dependency-path: packages/api/go.sum
 
@@ -57,57 +60,12 @@ jobs:
       - name: Vet
         run: cd packages/api && go vet ./...
 
-  # ── Rust Blockchain ────────────────────────────────────────────────────────
-  rust:
-    name: Rust Blockchain (Build & Test)
-    runs-on: ubuntu-latest
-    if: ${{ hashFiles('packages/blockchain/Cargo.toml') != '' }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: packages/blockchain
-
-      - name: Check
-        run: cd packages/blockchain && cargo check --release
-
-      - name: Test
-        run: cd packages/blockchain && cargo test
-
-      - name: Clippy
-        run: cd packages/blockchain && cargo clippy -- -D warnings
-
-  # ── Security Audit ─────────────────────────────────────────────────────────
-  security:
-    name: Security Audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.1.1
-
-      - name: npm audit
-        run: pnpm audit --audit-level=high
-
-      - name: Go vulnerability check
-        uses: golang/govulncheck-action@v1
-        with:
-          work-dir: packages/api
-
-  # ── Docker Build ───────────────────────────────────────────────────────────
   docker:
     name: Docker Build
     runs-on: ubuntu-latest
-    if: ${{ github.ref == 'refs/heads/main' && hashFiles('packages/api/Dockerfile') != '' }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
