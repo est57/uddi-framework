@@ -2,6 +2,12 @@
 
 Core TypeScript primitives for the UDDI framework.
 
+## Install
+
+```bash
+pnpm add @uddi/core
+```
+
 ## What It Provides
 
 - Ed25519 identity generation.

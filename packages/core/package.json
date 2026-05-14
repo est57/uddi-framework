@@ -5,6 +5,12 @@
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "package.json"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -29,6 +35,7 @@
   },
   "scripts": {
     "build": "tsup src/index.ts src/identity/index.ts src/types/index.ts src/vc/index.ts --format cjs,esm --dts",
+    "prepack": "pnpm build",
     "test": "vitest run",
     "lint": "eslint src --ext .ts",
     "dev": "tsup src/index.ts src/identity/index.ts src/types/index.ts src/vc/index.ts --format cjs,esm --dts --watch",
@@ -40,10 +47,34 @@
     "@scure/base": "^1.1.6",
     "uuid": "^9.0.0"
   },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/est57/uddi-framework.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/est57/uddi-framework/issues"
+  },
+  "homepage": "https://github.com/est57/uddi-framework/tree/main/packages/core#readme",
+  "keywords": [
+    "decentralized-identity",
+    "did",
+    "verifiable-credentials",
+    "ed25519",
+    "ssi",
+    "uddi"
+  ],
   "devDependencies": {
     "tsup": "^8.0.0",
     "typescript": "^5.4.0",
     "vitest": "^1.4.0"
+  },
+  "engines": {
+    "node": ">=22.13.0"
   },
   "license": "Apache-2.0"
 }

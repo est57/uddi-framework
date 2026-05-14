@@ -74,6 +74,12 @@ pnpm -r test
 pnpm -r lint
 ```
 
+Preview npm package contents:
+
+```bash
+pnpm pack:dry-run
+```
+
 Run Go API checks:
 
 ```bash

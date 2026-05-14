@@ -18,6 +18,7 @@
     "api:vet": "cd packages/api && mkdir -p .cache/go-build .cache/go-mod && GOCACHE=$PWD/.cache/go-build GOMODCACHE=$PWD/.cache/go-mod go vet ./...",
     "check": "pnpm build && pnpm test && pnpm lint && pnpm api:test && pnpm api:vet",
     "example:auth-flow": "pnpm --filter @uddi/example-auth-flow start",
+    "pack:dry-run": "pnpm --filter @uddi/core pack --dry-run && pnpm --filter @uddi/sdk pack --dry-run",
     "dev": "pnpm -r --parallel dev",
     "clean": "pnpm -r clean && rm -rf node_modules",
     "changeset": "changeset",
@@ -47,8 +48,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/uddi-protocol/uddi.git"
+    "url": "git+https://github.com/est57/uddi-framework.git"
   },
+  "bugs": {
+    "url": "https://github.com/est57/uddi-framework/issues"
+  },
+  "homepage": "https://github.com/est57/uddi-framework#readme",
   "keywords": [
     "decentralized-identity",
     "did",

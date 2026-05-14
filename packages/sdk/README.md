@@ -2,6 +2,12 @@
 
 Developer-facing TypeScript SDK for integrating UDDI holder and verifier flows.
 
+## Install
+
+```bash
+pnpm add @uddi/sdk
+```
+
 ## Main Classes
 
 - `UddiClient`: holder/user-side identity operations.
