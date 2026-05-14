@@ -151,6 +151,12 @@ pnpm build
 pnpm example:auth-flow
 ```
 
+Run the npm package quickstart example:
+
+```bash
+pnpm --filter @uddi/example-npm-quickstart start
+```
+
 ## SDK Example
 
 Install the published TypeScript packages:
