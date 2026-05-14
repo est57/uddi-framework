@@ -36,12 +36,13 @@ func NewRouter(cfg *config.Config, chainClient *blockchain.Client, zkpService *z
 	proofHandler := handlers.NewProofHandler(zkpService, chainClient)
 
 	r := chi.NewRouter()
+	metrics := middleware.NewMetrics()
 
 	r.Use(chimiddleware.RequestID)
 	r.Use(chimiddleware.RealIP)
-	r.Use(chimiddleware.Logger)
 	r.Use(chimiddleware.Recoverer)
 	r.Use(chimiddleware.Timeout(30 * time.Second))
+	r.Use(metrics.Middleware)
 	r.Use(middleware.SecurityHeaders)
 	r.Use(middleware.LimitRequestBody(cfg.MaxRequestBodyBytes))
 	r.Use(middleware.NewRateLimiter(cfg.RateLimitRequests, cfg.RateLimitWindow).Middleware)
@@ -56,6 +57,11 @@ func NewRouter(cfg *config.Config, chainClient *blockchain.Client, zkpService *z
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok","version":"0.1.0"}`))
 	})
+	r.Get("/ready", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"ready","version":"0.1.0"}`))
+	})
+	r.Get("/metrics", metrics.Handler)
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Route("/did", func(r chi.Router) {

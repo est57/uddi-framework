@@ -14,6 +14,7 @@ Implemented today:
 - API key validation with seeded development credentials.
 - Admin API key management for creating, listing, and revoking service API keys.
 - Security headers, request body limits, and per-IP rate limiting.
+- Liveness, readiness, JSON metrics, and structured request logging.
 - Auth challenge creation.
 - Auth presentation verification with Ed25519.
 - Challenge replay protection.
@@ -79,6 +80,13 @@ Then check:
 
 ```bash
 curl http://localhost:8080/health
+```
+
+Readiness and metrics:
+
+```bash
+curl http://localhost:8080/ready
+curl http://localhost:8080/metrics
 ```
 
 ## Run With Docker Compose

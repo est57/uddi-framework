@@ -19,6 +19,7 @@ Implemented today:
 - API key validation with memory and Postgres-backed stores, including seeded development credentials.
 - Admin API key management for creating, listing, and revoking service API keys.
 - API hardening middleware for security headers, request body limits, and per-IP rate limiting.
+- Observability endpoints for liveness, readiness, JSON metrics, and structured request logs.
 - Versioned Postgres schema migrations for DID, API key, and credential tables.
 - Circom circuit drafts for age and citizenship verification.
 - CI workflow for TypeScript and Go checks, with Rust/Docker jobs gated until those packages exist.
@@ -174,6 +175,8 @@ Detailed request and response examples live in [`docs/API.md`](./docs/API.md).
 Current REST surface:
 
 - `GET /health`
+- `GET /ready`
+- `GET /metrics`
 - `POST /v1/did/register`
 - `GET /v1/did/{did}`
 - `POST /v1/did/revoke`
@@ -314,6 +317,18 @@ UDDI_MAX_REQUEST_BODY_BYTES=1048576
 UDDI_RATE_LIMIT_REQUESTS=120
 UDDI_RATE_LIMIT_WINDOW_SECONDS=60
 ```
+
+### Observability
+
+The API exposes:
+
+```text
+GET /health   # liveness
+GET /ready    # readiness
+GET /metrics  # JSON counters and latency summary
+```
+
+HTTP requests are logged with method, path, status, duration, remote address, request ID, and user agent.
 
 ### Database Migrations
 

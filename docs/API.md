@@ -58,6 +58,45 @@ Response:
 }
 ```
 
+### `GET /ready`
+
+```bash
+curl http://localhost:8080/ready
+```
+
+Response:
+
+```json
+{
+  "status": "ready",
+  "version": "0.1.0"
+}
+```
+
+### `GET /metrics`
+
+Returns lightweight JSON runtime metrics.
+
+```bash
+curl http://localhost:8080/metrics
+```
+
+Response:
+
+```json
+{
+  "startedAt": "2026-05-14T04:00:00Z",
+  "uptimeSeconds": 60,
+  "requestsTotal": 42,
+  "responsesTotal": 41,
+  "errorsTotal": 0,
+  "inFlightRequests": 1,
+  "latencyTotalMs": 120,
+  "latencyAverageMs": 2.92,
+  "metricsContentType": "application/json"
+}
+```
+
 ## DID Registry
 
 ### `POST /v1/did/register`

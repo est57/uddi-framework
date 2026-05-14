@@ -33,6 +33,23 @@ func TestHealth(t *testing.T) {
 	}
 }
 
+func TestReadinessAndMetrics(t *testing.T) {
+	router := newTestRouter(t)
+
+	readyRes := performRequest(router, http.MethodGet, "/ready", nil, nil)
+	if readyRes.Code != http.StatusOK {
+		t.Fatalf("expected ready status 200, got %d", readyRes.Code)
+	}
+	assertJSONField(t, readyRes.Body.Bytes(), "status", "ready")
+
+	metricsRes := performRequest(router, http.MethodGet, "/metrics", nil, nil)
+	if metricsRes.Code != http.StatusOK {
+		t.Fatalf("expected metrics status 200, got %d", metricsRes.Code)
+	}
+	assertJSONField(t, metricsRes.Body.Bytes(), "metricsContentType", "application/json")
+	assertJSONNumberAtLeast(t, metricsRes.Body.Bytes(), "requestsTotal", 2)
+}
+
 func TestAPIKeyMiddleware(t *testing.T) {
 	router := newTestRouter(t)
 
@@ -667,6 +684,22 @@ func assertJSONField(t *testing.T, payload []byte, key string, expected any) {
 	}
 	if decoded[key] != expected {
 		t.Fatalf("expected %s=%v, got %v in %s", key, expected, decoded[key], string(payload))
+	}
+}
+
+func assertJSONNumberAtLeast(t *testing.T, payload []byte, key string, minimum float64) {
+	t.Helper()
+
+	var decoded map[string]any
+	if err := json.Unmarshal(payload, &decoded); err != nil {
+		t.Fatalf("decode json: %v", err)
+	}
+	value, ok := decoded[key].(float64)
+	if !ok {
+		t.Fatalf("expected numeric %s in %s", key, string(payload))
+	}
+	if value < minimum {
+		t.Fatalf("expected %s >= %v, got %v in %s", key, minimum, value, string(payload))
 	}
 }
 
