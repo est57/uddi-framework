@@ -371,6 +371,8 @@ Response:
 
 Stores a signed Verifiable Credential in the registry. The credential issuer DID and subject DID must already exist in the DID registry. The API verifies `proof.proofValue` against the issuer DID public key over the canonical credential payload without the `proof` field.
 
+`issuanceDate` must be RFC3339. When `expirationDate` is present, it must also be RFC3339 and later than `issuanceDate`.
+
 Request:
 
 ```bash
@@ -385,6 +387,7 @@ curl -X POST http://localhost:8080/v1/credentials/issue \
       "type": ["VerifiableCredential", "AgeCredential"],
       "issuer": "did:uddi:zIssuerIdentifierWithAtLeastFortyCharacters123",
       "issuanceDate": "2026-05-14T04:00:00Z",
+      "expirationDate": "2027-05-14T04:00:00Z",
       "credentialSubject": {
         "id": "did:uddi:zExampleIdentifierWithAtLeastFortyCharacters123",
         "birthYear": 2000
@@ -440,6 +443,8 @@ Response:
 ```
 
 ### `GET /v1/credentials/{id}/verify`
+
+Checks registry status, expiration, and credential proof. Revoked credentials return `valid: false` with `reason: "credential revoked"`. Expired credentials return `valid: false` with `reason: "credential expired"`.
 
 Response:
 

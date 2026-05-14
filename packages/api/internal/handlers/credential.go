@@ -171,8 +171,22 @@ func credentialRecordFromPayload(credential map[string]any) (CredentialRecord, e
 	if !ok {
 		return CredentialRecord{}, errors.New("credential.issuanceDate is required")
 	}
+	issuedAt, err := time.Parse(time.RFC3339, issuanceDate)
+	if err != nil {
+		return CredentialRecord{}, errors.New("credential.issuanceDate must be RFC3339")
+	}
 
 	expirationDate, _ := stringField(credential, "expirationDate")
+	if expirationDate != "" {
+		expiresAt, err := time.Parse(time.RFC3339, expirationDate)
+		if err != nil {
+			return CredentialRecord{}, errors.New("credential.expirationDate must be RFC3339")
+		}
+		if !expiresAt.After(issuedAt) {
+			return CredentialRecord{}, errors.New("credential.expirationDate must be after issuanceDate")
+		}
+	}
+
 	now := time.Now().UTC().Format(time.RFC3339)
 	return CredentialRecord{
 		ID:             id,

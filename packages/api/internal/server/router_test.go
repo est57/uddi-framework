@@ -579,6 +579,69 @@ func TestCredentialIssueRejectsInvalidProof(t *testing.T) {
 	assertJSONField(t, issueRes.Body.Bytes(), "error", "invalid credential proof")
 }
 
+func TestCredentialVerifyReportsExpiredCredential(t *testing.T) {
+	router := newTestRouter(t)
+	issuer := newTestIdentityWithSuffix(t, "issuerexpiredABCDEFGHJKLMNPQRSTUVWXYZabcdefghij")
+	subject := newTestIdentityWithSuffix(t, "subjectexpiredABCDEFGHJKLMNPQRSTUVWXYZabcdefghij")
+	registerDID(t, router, issuer)
+	registerDID(t, router, subject)
+
+	credential := signedCredentialWithDates(
+		t,
+		issuer,
+		subject,
+		"urn:uddi:vc:expired",
+		time.Now().UTC().Add(-48*time.Hour),
+		time.Now().UTC().Add(-24*time.Hour),
+	)
+
+	issueRes := performRequest(router, http.MethodPost, "/v1/credentials/issue", map[string]any{
+		"credential": credential,
+	}, apiHeaders())
+	if issueRes.Code != http.StatusCreated {
+		t.Fatalf("expected issue status 201, got %d: %s", issueRes.Code, issueRes.Body.String())
+	}
+
+	verifyRes := performRequest(router, http.MethodGet, "/v1/credentials/urn:uddi:vc:expired/verify", nil, apiHeaders())
+	assertJSONField(t, verifyRes.Body.Bytes(), "valid", false)
+	assertJSONField(t, verifyRes.Body.Bytes(), "reason", "credential expired")
+}
+
+func TestCredentialIssueValidatesDates(t *testing.T) {
+	router := newTestRouter(t)
+	issuer := newTestIdentityWithSuffix(t, "issuerdateABCDEFGHJKLMNPQRSTUVWXYZabcdefghij")
+	subject := newTestIdentityWithSuffix(t, "subjectdateABCDEFGHJKLMNPQRSTUVWXYZabcdefghij")
+	registerDID(t, router, issuer)
+	registerDID(t, router, subject)
+
+	credential := signedCredential(t, issuer, subject, "urn:uddi:vc:invalid-date")
+	credential["expirationDate"] = "not-a-date"
+
+	issueRes := performRequest(router, http.MethodPost, "/v1/credentials/issue", map[string]any{
+		"credential": credential,
+	}, apiHeaders())
+	if issueRes.Code != http.StatusBadRequest {
+		t.Fatalf("expected issue status 400, got %d: %s", issueRes.Code, issueRes.Body.String())
+	}
+	assertJSONField(t, issueRes.Body.Bytes(), "error", "credential.expirationDate must be RFC3339")
+
+	reversedDatesCredential := signedCredentialWithDates(
+		t,
+		issuer,
+		subject,
+		"urn:uddi:vc:reversed-dates",
+		time.Date(2026, 5, 14, 10, 0, 0, 0, time.UTC),
+		time.Date(2026, 5, 14, 9, 0, 0, 0, time.UTC),
+	)
+	reversedDatesRes := performRequest(router, http.MethodPost, "/v1/credentials/issue", map[string]any{
+		"credential": reversedDatesCredential,
+	}, apiHeaders())
+	if reversedDatesRes.Code != http.StatusBadRequest {
+		t.Fatalf("expected issue status 400, got %d: %s", reversedDatesRes.Code, reversedDatesRes.Body.String())
+	}
+	assertJSONField(t, reversedDatesRes.Body.Bytes(), "error", "credential.expirationDate must be after issuanceDate")
+}
+
 type testIdentity struct {
 	did        string
 	publicKey  ed25519.PublicKey
@@ -736,16 +799,32 @@ func signBase64(t *testing.T, privateKey ed25519.PrivateKey, message string) str
 func signedCredential(t *testing.T, issuer testIdentity, subject testIdentity, id string) map[string]any {
 	t.Helper()
 
+	return signedCredentialWithDates(t, issuer, subject, id, time.Now().UTC(), time.Time{})
+}
+
+func signedCredentialWithDates(
+	t *testing.T,
+	issuer testIdentity,
+	subject testIdentity,
+	id string,
+	issuanceDate time.Time,
+	expirationDate time.Time,
+) map[string]any {
+	t.Helper()
+
 	credential := map[string]any{
 		"@context":     []any{"https://www.w3.org/2018/credentials/v1"},
 		"id":           id,
 		"type":         []any{"VerifiableCredential", "AgeCredential"},
 		"issuer":       issuer.did,
-		"issuanceDate": time.Now().UTC().Format(time.RFC3339),
+		"issuanceDate": issuanceDate.Format(time.RFC3339),
 		"credentialSubject": map[string]any{
 			"id":        subject.did,
 			"birthYear": 2000,
 		},
+	}
+	if !expirationDate.IsZero() {
+		credential["expirationDate"] = expirationDate.Format(time.RFC3339)
 	}
 	message, err := canonicalizeForTest(credential)
 	if err != nil {
