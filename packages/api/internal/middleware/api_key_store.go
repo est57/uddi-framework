@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/uddi-protocol/uddi/api/internal/storage"
 )
 
 var (
@@ -119,13 +119,13 @@ type PostgresAPIKeyStore struct {
 }
 
 func NewPostgresAPIKeyStore(ctx context.Context, databaseURL string) (*PostgresAPIKeyStore, error) {
-	db, err := sql.Open("pgx", databaseURL)
+	db, err := storage.OpenPostgres(ctx, databaseURL)
 	if err != nil {
 		return nil, err
 	}
 
 	store := &PostgresAPIKeyStore{db: db}
-	if err := store.migrate(ctx); err != nil {
+	if err := store.seed(ctx); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
@@ -210,23 +210,7 @@ func (s *PostgresAPIKeyStore) Revoke(ctx context.Context, serviceID string) erro
 	return nil
 }
 
-func (s *PostgresAPIKeyStore) migrate(ctx context.Context) error {
-	if err := s.db.PingContext(ctx); err != nil {
-		return err
-	}
-
-	if _, err := s.db.ExecContext(ctx, `
-		CREATE TABLE IF NOT EXISTS api_keys (
-			service_id TEXT PRIMARY KEY,
-			service_name TEXT NOT NULL,
-			api_key_hash TEXT NOT NULL,
-			created_at TEXT NOT NULL,
-			revoked_at TEXT
-		)
-	`); err != nil {
-		return err
-	}
-
+func (s *PostgresAPIKeyStore) seed(ctx context.Context) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	seeds := []struct {
 		serviceID   string

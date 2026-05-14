@@ -7,7 +7,7 @@ import (
 	"errors"
 	"time"
 
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/uddi-protocol/uddi/api/internal/storage"
 )
 
 type PostgresDIDStore struct {
@@ -15,17 +15,11 @@ type PostgresDIDStore struct {
 }
 
 func NewPostgresDIDStore(ctx context.Context, databaseURL string) (*PostgresDIDStore, error) {
-	db, err := sql.Open("pgx", databaseURL)
+	db, err := storage.OpenPostgres(ctx, databaseURL)
 	if err != nil {
 		return nil, err
 	}
-
-	store := &PostgresDIDStore{db: db}
-	if err := store.migrate(ctx); err != nil {
-		_ = db.Close()
-		return nil, err
-	}
-	return store, nil
+	return &PostgresDIDStore{db: db}, nil
 }
 
 func (s *PostgresDIDStore) Close() error {
@@ -103,22 +97,4 @@ func (s *PostgresDIDStore) Update(ctx context.Context, doc DIDDocument) error {
 		return ErrDIDNotFound
 	}
 	return nil
-}
-
-func (s *PostgresDIDStore) migrate(ctx context.Context) error {
-	if err := s.db.PingContext(ctx); err != nil {
-		return err
-	}
-
-	_, err := s.db.ExecContext(ctx, `
-		CREATE TABLE IF NOT EXISTS dids (
-			did TEXT PRIMARY KEY,
-			context JSONB NOT NULL,
-			public_key_base64 TEXT NOT NULL,
-			created TEXT NOT NULL,
-			updated TEXT NOT NULL,
-			deactivated BOOLEAN NOT NULL DEFAULT FALSE
-		)
-	`)
-	return err
 }

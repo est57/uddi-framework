@@ -23,6 +23,7 @@ Implemented today:
 - Credential registry with in-memory and Postgres implementations.
 - Ed25519 Verifiable Credential proof verification before storing and during status verification.
 - ZKP endpoint stubs.
+- Versioned Postgres migrations tracked in `schema_migrations`.
 
 ## Run Checks
 

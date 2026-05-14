@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/uddi-protocol/uddi/api/internal/storage"
 )
 
 var (
@@ -103,17 +103,11 @@ type PostgresCredentialStore struct {
 }
 
 func NewPostgresCredentialStore(ctx context.Context, databaseURL string) (*PostgresCredentialStore, error) {
-	db, err := sql.Open("pgx", databaseURL)
+	db, err := storage.OpenPostgres(ctx, databaseURL)
 	if err != nil {
 		return nil, err
 	}
-
-	store := &PostgresCredentialStore{db: db}
-	if err := store.migrate(ctx); err != nil {
-		_ = db.Close()
-		return nil, err
-	}
-	return store, nil
+	return &PostgresCredentialStore{db: db}, nil
 }
 
 func (s *PostgresCredentialStore) Close() error {
@@ -210,32 +204,6 @@ func (s *PostgresCredentialStore) Revoke(ctx context.Context, id string, reason 
 		return ErrCredentialNotFound
 	}
 	return nil
-}
-
-func (s *PostgresCredentialStore) migrate(ctx context.Context) error {
-	if err := s.db.PingContext(ctx); err != nil {
-		return err
-	}
-
-	_, err := s.db.ExecContext(ctx, `
-		CREATE TABLE IF NOT EXISTS credentials (
-			id TEXT PRIMARY KEY,
-			issuer_did TEXT NOT NULL,
-			subject_did TEXT NOT NULL,
-			types JSONB NOT NULL,
-			credential JSONB NOT NULL,
-			issuance_date TEXT NOT NULL,
-			expiration_date TEXT,
-			created_at TEXT NOT NULL,
-			revoked_at TEXT,
-			revocation_reason TEXT
-		);
-		CREATE INDEX IF NOT EXISTS credentials_subject_did_idx
-			ON credentials(subject_did);
-		CREATE INDEX IF NOT EXISTS credentials_issuer_did_idx
-			ON credentials(issuer_did);
-	`)
-	return err
 }
 
 type credentialScanner interface {

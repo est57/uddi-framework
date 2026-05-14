@@ -19,6 +19,7 @@ Implemented today:
 - API key validation with memory and Postgres-backed stores, including seeded development credentials.
 - Admin API key management for creating, listing, and revoking service API keys.
 - API hardening middleware for security headers, request body limits, and per-IP rate limiting.
+- Versioned Postgres schema migrations for DID, API key, and credential tables.
 - Circom circuit drafts for age and citizenship verification.
 - CI workflow for TypeScript and Go checks, with Rust/Docker jobs gated until those packages exist.
 
@@ -313,6 +314,10 @@ UDDI_MAX_REQUEST_BODY_BYTES=1048576
 UDDI_RATE_LIMIT_REQUESTS=120
 UDDI_RATE_LIMIT_WINDOW_SECONDS=60
 ```
+
+### Database Migrations
+
+When `UDDI_DATABASE_URL` is configured, the API runs versioned Postgres migrations at startup. Applied versions are tracked in the `schema_migrations` table.
 
 ## Sequence Diagrams
 
