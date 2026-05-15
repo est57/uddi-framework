@@ -198,7 +198,7 @@ if (result.valid) {
 
 ## API Overview
 
-Detailed request and response examples live in [`docs/API.md`](./docs/API.md).
+Detailed request and response examples live in [`docs/API.md`](./docs/API.md). A machine-readable OpenAPI 3.1 contract is available at [`docs/openapi.yaml`](./docs/openapi.yaml).
 
 Current REST surface:
 

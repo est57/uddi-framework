@@ -3,6 +3,8 @@
 This document describes the current alpha REST API exposed by `packages/api`.
 The local examples assume the API is running on `http://localhost:8080`.
 
+For tooling and generated clients, see the OpenAPI 3.1 contract in [`openapi.yaml`](./openapi.yaml).
+
 Protected endpoints require these headers:
 
 ```http
