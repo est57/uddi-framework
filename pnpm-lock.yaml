@@ -57,11 +57,11 @@ importers:
   examples/npm-quickstart:
     dependencies:
       '@uddi/core':
-        specifier: 0.1.0
-        version: 0.1.0
+        specifier: 0.1.1
+        version: 0.1.1
       '@uddi/sdk':
-        specifier: 0.1.0
-        version: 0.1.0
+        specifier: 0.1.1
+        version: 0.1.1
 
   packages/core:
     dependencies:
@@ -761,12 +761,12 @@ packages:
     resolution: {integrity: sha512-JJtkDduxLi9bivAB+cYOVMtbkqdPOhZ+ZI5LC47MIRrDV4Yn2o+ZnW10Nkmr28xRpSpdJ6Sm42Hjf2+REYXm0A==}
     engines: {node: ^16.0.0 || >=18.0.0}
 
-  '@uddi/core@0.1.0':
-    resolution: {integrity: sha512-JldQZq45T/dmwSz8iYAdmRJOzutj2VnkbxtwQA6WLkEuGfABLtIgdp8lH8ieL3Fqor8VGL9mVbOW9RuDo5uadw==}
+  '@uddi/core@0.1.1':
+    resolution: {integrity: sha512-meEY2yicDsPZj5tjy2dmfK6G1v1iSg2G5gGF4cVaM66207dsuG7KEBFPSseoCm3OrhvFGz/mRRRBjAaYiYi1Rg==}
     engines: {node: '>=22.13.0'}
 
-  '@uddi/sdk@0.1.0':
-    resolution: {integrity: sha512-7ec4IJVmRTlk1YQ5x7g4449gm6gUCBGvIA4onrv4DZ4lt1DxDRmOw82bW8HsHT8KS7GK+mW0oMpFzamKrz/6eA==}
+  '@uddi/sdk@0.1.1':
+    resolution: {integrity: sha512-wQOp6U9dMwK5xdr4sMIsf6KrVVw0tSAsV2/YBVAQRyZgn0UWO5sbl724nOVbRCLBArznclkGXFuz5Pzmv3lIsw==}
     engines: {node: '>=22.13.0'}
 
   '@ungap/structured-clone@1.3.1':
@@ -2382,16 +2382,16 @@ snapshots:
       '@typescript-eslint/types': 6.21.0
       eslint-visitor-keys: 3.4.3
 
-  '@uddi/core@0.1.0':
+  '@uddi/core@0.1.1':
     dependencies:
       '@noble/ed25519': 2.3.0
       '@noble/hashes': 1.8.0
       '@scure/base': 1.2.6
       uuid: 9.0.1
 
-  '@uddi/sdk@0.1.0':
+  '@uddi/sdk@0.1.1':
     dependencies:
-      '@uddi/core': 0.1.0
+      '@uddi/core': 0.1.1
 
   '@ungap/structured-clone@1.3.1': {}
 

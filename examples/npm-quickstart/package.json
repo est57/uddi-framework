@@ -11,8 +11,8 @@
     "lint": "node --check index.mjs"
   },
   "dependencies": {
-    "@uddi/core": "0.1.0",
-    "@uddi/sdk": "0.1.0"
+    "@uddi/core": "0.1.1",
+    "@uddi/sdk": "0.1.1"
   },
   "license": "Apache-2.0"
 }
