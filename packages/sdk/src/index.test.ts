@@ -111,6 +111,65 @@ describe('UddiClient', () => {
     await expect(storage.load()).resolves.toBeNull();
     expect(client.getDid()).toBeNull();
   });
+
+  it('rotates the loaded identity key and keeps the DID stable', async () => {
+    const storedIdentity = await generateIdentity();
+    const fetchMock = mockFetch({
+      did: storedIdentity.did,
+      txHash: '0xupdate',
+      status: 'UPDATED',
+      updatedAt: new Date().toISOString(),
+    });
+    const storage = createMemoryStorage(storedIdentity);
+    const client = new UddiClient({
+      network: 'local',
+      storage,
+    });
+
+    await client.loadIdentity();
+    const result = await client.rotateIdentityKey(['https://example.com/context']);
+
+    expect(result).toMatchObject({
+      did: storedIdentity.did,
+      txHash: '0xupdate',
+      status: 'UPDATED',
+    });
+    expect(client.getDid()).toBe(storedIdentity.did);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(`http://localhost:8080/v1/did/${storedIdentity.did}/update`);
+    expect(fetchMock.mock.calls[0]?.[1]?.method).toBe('PUT');
+
+    const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(request).toMatchObject({
+      did: storedIdentity.did,
+      context: ['https://example.com/context'],
+      publicKeyBase64: expect.any(String),
+      timestamp: expect.any(String),
+      signatureBase64: expect.any(String),
+    });
+
+    const rotatedIdentity = await storage.load();
+    expect(rotatedIdentity?.did).toBe(storedIdentity.did);
+    expect(rotatedIdentity?.publicKey).not.toEqual(storedIdentity.publicKey);
+    expect(rotatedIdentity?.privateKey).not.toEqual(storedIdentity.privateKey);
+  });
+
+  it('keeps the previous key if identity key rotation is rejected', async () => {
+    const storedIdentity = await generateIdentity();
+    const fetchMock = vi.fn(async () => jsonResponse({ error: 'invalid signature' }, 401));
+    vi.stubGlobal('fetch', fetchMock);
+    const storage = createMemoryStorage(storedIdentity);
+    const client = new UddiClient({
+      network: 'local',
+      storage,
+    });
+
+    await client.loadIdentity();
+
+    await expect(client.rotateIdentityKey()).rejects.toThrow('UDDI API error: invalid signature');
+    const identityAfterFailure = await storage.load();
+    expect(identityAfterFailure).toEqual(storedIdentity);
+    expect(client.getDid()).toBe(storedIdentity.did);
+  });
 });
 
 describe('UddiVerifier', () => {

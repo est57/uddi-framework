@@ -60,6 +60,13 @@ export interface IdentityStorage {
   delete(): Promise<void>;
 }
 
+export interface DIDUpdateResult {
+  did: Did;
+  txHash: string;
+  status: 'UPDATED';
+  updatedAt: string;
+}
+
 /**
  * UddiClient — used on the user/holder side
  *
@@ -175,6 +182,44 @@ export class UddiClient {
   }
 
   /**
+   * Rotate the current DID's signing key while keeping the DID identifier.
+   *
+   * The update request is signed with the current private key. After the API
+   * accepts the update, the SDK stores the new private/public key pair locally.
+   */
+  async rotateIdentityKey(context?: string[]): Promise<DIDUpdateResult> {
+    this.requireIdentity();
+
+    const currentIdentity = this.identity!;
+    const nextIdentity = await generateIdentity();
+    const publicKeyBase64 = exportPublicIdentity(nextIdentity).publicKey;
+    const timestamp = Date.now().toString();
+    const message = `update:${currentIdentity.did}:${publicKeyBase64}:${timestamp}`;
+    const signature = await signMessage(message, currentIdentity.privateKey);
+
+    const response = await this.put(`/v1/did/${currentIdentity.did}/update`, {
+      did: currentIdentity.did,
+      publicKeyBase64,
+      ...(context && { context }),
+      signatureBase64: signature,
+      timestamp,
+    });
+
+    this.identity = {
+      did: currentIdentity.did,
+      privateKey: nextIdentity.privateKey,
+      publicKey: nextIdentity.publicKey,
+      createdAt: currentIdentity.createdAt,
+    };
+
+    if (this.storage) {
+      await this.storage.save(this.identity);
+    }
+
+    return response as unknown as DIDUpdateResult;
+  }
+
+  /**
    * Revoke the current identity (cannot be undone)
    */
   async revokeIdentity(): Promise<void> {
@@ -227,6 +272,19 @@ export class UddiClient {
   private async post(path: string, body: unknown): Promise<Record<string, unknown>> {
     const res = await fetch(`${this.apiUrl}${path}`, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const error = await readAPIError(res);
+      throw new Error(`UDDI API error: ${error}`);
+    }
+    return res.json();
+  }
+
+  private async put(path: string, body: unknown): Promise<Record<string, unknown>> {
+    const res = await fetch(`${this.apiUrl}${path}`, {
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });

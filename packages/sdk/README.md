@@ -17,6 +17,7 @@ pnpm add @uddi/sdk
 
 - Create and load identities.
 - Register identities through the API.
+- Rotate DID signing keys while keeping the same DID.
 - Sign auth challenges.
 - Request proof generation through the API.
 - Resolve DIDs.
@@ -55,6 +56,19 @@ const result = await verifier.verifyAuth(challenge.challengeId, presentation);
 
 console.log(did, result.valid);
 ```
+
+## DID Key Rotation
+
+Holder apps can rotate the local DID key pair without changing the DID identifier:
+
+```typescript
+await client.loadIdentity();
+const update = await client.rotateIdentityKey();
+
+console.log(update.status); // UPDATED
+```
+
+The SDK signs the update with the current private key, sends the new public key to the API, and only stores the new key pair after the API accepts the update.
 
 ## Credential Registry
 
