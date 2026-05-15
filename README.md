@@ -212,6 +212,8 @@ Detailed request and response examples live in [`docs/API.md`](./docs/API.md). A
 
 Deployment guidance for shared and production-like environments lives in [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md).
 
+Release notes are tracked in [`CHANGELOG.md`](./CHANGELOG.md).
+
 Current REST surface:
 
 - `GET /health`
