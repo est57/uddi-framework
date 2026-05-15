@@ -3,7 +3,7 @@
 This document describes the current alpha REST API exposed by `packages/api`.
 The local examples assume the API is running on `http://localhost:8080`.
 
-For tooling and generated clients, see the OpenAPI 3.1 contract in [`openapi.yaml`](./openapi.yaml). When the API is running, the same contract is available at `GET /openapi.yaml`.
+For tooling and generated clients, see the OpenAPI 3.1 contract in [`openapi.yaml`](./openapi.yaml). When the API is running, the same contract is available at `GET /openapi.yaml`, and Swagger UI is available at `GET /docs`.
 
 Protected endpoints require these headers:
 

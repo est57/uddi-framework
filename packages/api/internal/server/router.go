@@ -69,6 +69,11 @@ func NewRouter(cfg *config.Config, chainClient *blockchain.Client, zkpService *z
 		w.Header().Set("Cache-Control", "no-store")
 		_, _ = w.Write(apidocs.OpenAPIYAML)
 	})
+	r.Get("/docs", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		_, _ = w.Write([]byte(swaggerUIHTML))
+	})
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Route("/did", func(r chi.Router) {
@@ -126,6 +131,33 @@ func newAPIKeyStore(cfg *config.Config) (middleware.APIKeyStore, error) {
 	}
 	return store, nil
 }
+
+const swaggerUIHTML = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>UDDI API Docs</title>
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+    <style>
+      body { margin: 0; background: #ffffff; }
+      .swagger-ui .topbar { display: none; }
+    </style>
+  </head>
+  <body>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script>
+      window.ui = SwaggerUIBundle({
+        url: "/openapi.yaml",
+        dom_id: "#swagger-ui",
+        deepLinking: true,
+        persistAuthorization: true,
+        displayRequestDuration: true
+      });
+    </script>
+  </body>
+</html>`
 
 func newChallengeStore(cfg *config.Config) (handlers.ChallengeStore, error) {
 	if cfg.RedisURL == "" {

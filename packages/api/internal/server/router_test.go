@@ -66,6 +66,25 @@ func TestOpenAPIYAML(t *testing.T) {
 	}
 }
 
+func TestSwaggerDocs(t *testing.T) {
+	router := newTestRouter(t)
+
+	res := performRequest(router, http.MethodGet, "/docs", nil, nil)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected docs status 200, got %d: %s", res.Code, res.Body.String())
+	}
+	if contentType := res.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "text/html") {
+		t.Fatalf("expected html content type, got %s", contentType)
+	}
+	body := res.Body.String()
+	if !strings.Contains(body, "SwaggerUIBundle") {
+		t.Fatalf("expected Swagger UI bootstrap script")
+	}
+	if !strings.Contains(body, `url: "/openapi.yaml"`) {
+		t.Fatalf("expected Swagger UI to load /openapi.yaml")
+	}
+}
+
 func TestRegistryStatsUsesDIDStoreState(t *testing.T) {
 	router := newTestRouter(t)
 	identity := newTestIdentityWithSuffix(t, "stats123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghij")
