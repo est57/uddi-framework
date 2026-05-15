@@ -471,7 +471,7 @@ export class UddiVerifier {
       throw new Error('Credential id is required');
     }
 
-    const response = await this.get(`/v1/credentials/${encodeURIComponent(id)}/verify`);
+    const response = await this.get(`/v1/credentials/${id}/verify`);
     return response as unknown as CredentialStatusResult;
   }
 

@@ -258,7 +258,7 @@ describe('UddiVerifier', () => {
       if (url.endsWith(`/v1/credentials/${credential.credentialSubject.id}`)) {
         return jsonResponse({ did: credential.credentialSubject.id, credentials: [{ id: credential.id }] });
       }
-      if (url.endsWith(`/v1/credentials/${encodeURIComponent(credential.id)}/verify`)) {
+      if (url.endsWith(`/v1/credentials/${credential.id}/verify`)) {
         return jsonResponse({
           id: credential.id,
           valid: true,

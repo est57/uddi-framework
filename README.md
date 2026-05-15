@@ -117,7 +117,13 @@ docker run --rm -p 8080:8080 uddi-api
 Run the current local compose stack:
 
 ```bash
-docker compose -f infra/docker/docker-compose.dev.yml up --build
+pnpm docker:dev
+```
+
+Verify the Docker API and SDK together with the E2E smoke test:
+
+```bash
+pnpm e2e:smoke
 ```
 
 With compose running, run the optional Postgres integration test:

@@ -45,6 +45,15 @@ importers:
         specifier: workspace:*
         version: link:../../packages/sdk
 
+  examples/e2e-smoke:
+    dependencies:
+      '@uddi/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@uddi/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+
   examples/npm-quickstart:
     dependencies:
       '@uddi/core':

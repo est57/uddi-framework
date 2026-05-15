@@ -189,6 +189,25 @@ curl http://localhost:8080/ready
 curl http://localhost:8080/metrics
 ```
 
+## Smoke Test
+
+After starting the local Docker stack, run the E2E smoke test from the repository root:
+
+```bash
+pnpm docker:dev
+pnpm e2e:smoke
+```
+
+The smoke test creates a temporary service API key through the admin endpoint, registers a holder DID, rotates its signing key, verifies an auth challenge, issues and revokes a credential, and checks `/health`, `/ready`, `/metrics`, `/openapi.yaml`, and `/docs`.
+
+For a non-default endpoint:
+
+```bash
+UDDI_API_URL=https://your-api.example \
+UDDI_ADMIN_TOKEN="$UDDI_ADMIN_TOKEN" \
+pnpm e2e:smoke
+```
+
 ## Backups
 
 Back up Postgres regularly. At minimum:
