@@ -202,6 +202,8 @@ if (result.valid) {
 
 Detailed request and response examples live in [`docs/API.md`](./docs/API.md). A machine-readable OpenAPI 3.1 contract is available at [`docs/openapi.yaml`](./docs/openapi.yaml) and is served by the API at `GET /openapi.yaml`. When the API is running, Swagger UI is available at `GET /docs`.
 
+Deployment guidance for shared and production-like environments lives in [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md).
+
 Current REST surface:
 
 - `GET /health`
