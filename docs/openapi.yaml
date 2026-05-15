@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: UDDI API
-  version: 0.1.0-alpha
+  version: 0.1.1-alpha
   summary: REST API contract for the UDDI decentralized identity framework.
   description: |
     Alpha REST API exposed by `packages/api`.
@@ -499,7 +499,7 @@ components:
           examples: [ok]
         version:
           type: string
-          examples: ["0.1.0"]
+          examples: ["0.1.1"]
     MetricsResponse:
       type: object
       required:

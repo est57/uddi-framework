@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -16,6 +17,8 @@ import (
 	"github.com/uddi-protocol/uddi/api/internal/middleware"
 	"github.com/uddi-protocol/uddi/api/internal/zkp"
 )
+
+const APIVersion = "0.1.1"
 
 func NewRouter(cfg *config.Config, chainClient *blockchain.Client, zkpService *zkp.Service) (http.Handler, error) {
 	didHandler := handlers.NewDIDHandler(chainClient)
@@ -57,11 +60,11 @@ func NewRouter(cfg *config.Config, chainClient *blockchain.Client, zkpService *z
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"status":"ok","version":"0.1.0"}`))
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "version": APIVersion})
 	})
 	r.Get("/ready", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"status":"ready","version":"0.1.0"}`))
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ready", "version": APIVersion})
 	})
 	r.Get("/metrics", metrics.Handler)
 	r.Get("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {

@@ -29,6 +29,7 @@ func TestHealth(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", res.Code)
 	}
 	assertJSONField(t, res.Body.Bytes(), "status", "ok")
+	assertJSONField(t, res.Body.Bytes(), "version", server.APIVersion)
 	if res.Header().Get("X-Content-Type-Options") != "nosniff" {
 		t.Fatalf("expected security headers to be set")
 	}
@@ -42,6 +43,7 @@ func TestReadinessAndMetrics(t *testing.T) {
 		t.Fatalf("expected ready status 200, got %d", readyRes.Code)
 	}
 	assertJSONField(t, readyRes.Body.Bytes(), "status", "ready")
+	assertJSONField(t, readyRes.Body.Bytes(), "version", server.APIVersion)
 
 	metricsRes := performRequest(router, http.MethodGet, "/metrics", nil, nil)
 	if metricsRes.Code != http.StatusOK {
