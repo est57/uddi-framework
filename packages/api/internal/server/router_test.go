@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -48,6 +49,21 @@ func TestReadinessAndMetrics(t *testing.T) {
 	}
 	assertJSONField(t, metricsRes.Body.Bytes(), "metricsContentType", "application/json")
 	assertJSONNumberAtLeast(t, metricsRes.Body.Bytes(), "requestsTotal", 2)
+}
+
+func TestOpenAPIYAML(t *testing.T) {
+	router := newTestRouter(t)
+
+	res := performRequest(router, http.MethodGet, "/openapi.yaml", nil, nil)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected openapi status 200, got %d: %s", res.Code, res.Body.String())
+	}
+	if contentType := res.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "application/yaml") {
+		t.Fatalf("expected yaml content type, got %s", contentType)
+	}
+	if !strings.Contains(res.Body.String(), "openapi: 3.1.0") {
+		t.Fatalf("expected openapi document body")
+	}
 }
 
 func TestRegistryStatsUsesDIDStoreState(t *testing.T) {

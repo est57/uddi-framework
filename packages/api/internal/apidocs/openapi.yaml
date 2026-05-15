@@ -1,0 +1,1019 @@
+openapi: 3.1.0
+info:
+  title: UDDI API
+  version: 0.1.0-alpha
+  summary: REST API contract for the UDDI decentralized identity framework.
+  description: |
+    Alpha REST API exposed by `packages/api`.
+
+    Protected service endpoints require `X-Service-ID` and `X-API-Key`.
+    Admin endpoints require `X-Admin-Token`.
+servers:
+  - url: http://localhost:8080
+    description: Local development API
+tags:
+  - name: Health
+  - name: DID Registry
+  - name: Authentication
+  - name: Credentials
+  - name: Admin
+  - name: ZKP
+  - name: Registry
+security: []
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness check
+      operationId: getHealth
+      responses:
+        "200":
+          description: API process is alive.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /ready:
+    get:
+      tags: [Health]
+      summary: Readiness check
+      operationId: getReady
+      responses:
+        "200":
+          description: API process is ready.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /metrics:
+    get:
+      tags: [Health]
+      summary: Runtime metrics
+      operationId: getMetrics
+      responses:
+        "200":
+          description: Lightweight JSON runtime metrics.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetricsResponse"
+  /v1/did/register:
+    post:
+      tags: [DID Registry]
+      summary: Register a DID
+      operationId: registerDid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterDIDRequest"
+      responses:
+        "201":
+          description: DID registered.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DIDMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: DID already registered.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/did/{did}:
+    get:
+      tags: [DID Registry]
+      summary: Resolve a DID
+      operationId: resolveDid
+      parameters:
+        - $ref: "#/components/parameters/DIDPath"
+      responses:
+        "200":
+          description: DID resolution result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DIDResolutionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/did/revoke:
+    post:
+      tags: [DID Registry]
+      summary: Revoke a DID
+      operationId: revokeDid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RevokeDIDRequest"
+      responses:
+        "200":
+          description: DID revoked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevokeDIDResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/did/{did}/update:
+    put:
+      tags: [DID Registry]
+      summary: Rotate DID public key
+      operationId: updateDid
+      parameters:
+        - $ref: "#/components/parameters/DIDPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDIDRequest"
+      responses:
+        "200":
+          description: DID updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DIDMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: DID is deactivated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/verify/challenge:
+    post:
+      tags: [Authentication]
+      summary: Create an authentication challenge
+      operationId: createAuthChallenge
+      security:
+        - ServiceId: []
+          ServiceKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateChallengeRequest"
+      responses:
+        "201":
+          description: Challenge created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthChallenge"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/verify/auth:
+    post:
+      tags: [Authentication]
+      summary: Verify an authentication presentation
+      operationId: verifyAuth
+      security:
+        - ServiceId: []
+          ServiceKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyAuthRequest"
+      responses:
+        "200":
+          description: "Verification result. Invalid presentations return `valid: false`."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthVerificationResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/verify/claim:
+    post:
+      tags: [ZKP]
+      summary: Verify a ZKP claim proof
+      operationId: verifyClaim
+      security:
+        - ServiceId: []
+          ServiceKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyClaimRequest"
+      responses:
+        "200":
+          description: Claim proof verification result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaimVerificationResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/credentials/{did}:
+    get:
+      tags: [Credentials]
+      summary: List credentials by subject DID
+      operationId: listCredentialsByDid
+      security:
+        - ServiceId: []
+          ServiceKey: []
+      parameters:
+        - $ref: "#/components/parameters/DIDPath"
+      responses:
+        "200":
+          description: Credential registry records.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListCredentialsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/credentials/issue:
+    post:
+      tags: [Credentials]
+      summary: Store a signed Verifiable Credential
+      operationId: issueCredential
+      security:
+        - ServiceId: []
+          ServiceKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IssueCredentialRequest"
+      responses:
+        "201":
+          description: Credential stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IssueCredentialResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: Credential already exists.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/credentials/revoke:
+    post:
+      tags: [Credentials]
+      summary: Revoke a credential record
+      operationId: revokeCredential
+      security:
+        - ServiceId: []
+          ServiceKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RevokeCredentialRequest"
+      responses:
+        "200":
+          description: Credential revoked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevokeCredentialResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/credentials/{id}/verify:
+    get:
+      tags: [Credentials]
+      summary: Verify credential registry status and proof
+      operationId: verifyCredentialStatus
+      security:
+        - ServiceId: []
+          ServiceKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Credential ID.
+      responses:
+        "200":
+          description: Credential verification result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CredentialStatusResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/admin/api-keys/:
+    get:
+      tags: [Admin]
+      summary: List API keys
+      operationId: listApiKeys
+      security:
+        - AdminToken: []
+      responses:
+        "200":
+          description: API key records.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListApiKeysResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Admin]
+      summary: Create an API key
+      operationId: createApiKey
+      security:
+        - AdminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateApiKeyRequest"
+      responses:
+        "201":
+          description: API key created. Plaintext key is returned only once.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateApiKeyResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: API key already exists.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/admin/api-keys/revoke:
+    post:
+      tags: [Admin]
+      summary: Revoke an API key
+      operationId: revokeApiKey
+      security:
+        - AdminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RevokeApiKeyRequest"
+      responses:
+        "200":
+          description: API key revoked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevokeApiKeyResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/proof/generate:
+    post:
+      tags: [ZKP]
+      summary: Generate a ZKP-shaped proof response
+      operationId: generateProof
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateProofRequest"
+      responses:
+        "200":
+          description: Proof generated by local adapter or remote prover.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenerateProofResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "502":
+          description: Remote ZKP service failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/registry/stats:
+    get:
+      tags: [Registry]
+      summary: Registry statistics
+      operationId: getRegistryStats
+      responses:
+        "200":
+          description: DID registry statistics.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistryStats"
+components:
+  securitySchemes:
+    ServiceId:
+      type: apiKey
+      in: header
+      name: X-Service-ID
+    ServiceKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    AdminToken:
+      type: apiKey
+      in: header
+      name: X-Admin-Token
+  responses:
+    BadRequest:
+      description: Invalid request.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  parameters:
+    DIDPath:
+      name: did
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/DID"
+  schemas:
+    DID:
+      type: string
+      pattern: "^did:uddi:z.{40,100}$"
+      examples:
+        - did:uddi:zExampleIdentifierWithAtLeastFortyCharacters123
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+    HealthResponse:
+      type: object
+      required: [status, version]
+      properties:
+        status:
+          type: string
+          examples: [ok]
+        version:
+          type: string
+          examples: ["0.1.0"]
+    MetricsResponse:
+      type: object
+      required:
+        - startedAt
+        - uptimeSeconds
+        - requestsTotal
+        - responsesTotal
+        - errorsTotal
+        - inFlightRequests
+        - latencyTotalMs
+        - latencyAverageMs
+        - metricsContentType
+      properties:
+        startedAt:
+          type: string
+          format: date-time
+        uptimeSeconds:
+          type: number
+        requestsTotal:
+          type: integer
+        responsesTotal:
+          type: integer
+        errorsTotal:
+          type: integer
+        inFlightRequests:
+          type: integer
+        latencyTotalMs:
+          type: number
+        latencyAverageMs:
+          type: number
+        metricsContentType:
+          type: string
+          const: application/json
+    RegisterDIDRequest:
+      type: object
+      required: [did, publicKeyBase64, signatureBase64, timestamp]
+      properties:
+        did:
+          $ref: "#/components/schemas/DID"
+        publicKeyBase64:
+          type: string
+          description: Base64 encoded Ed25519 public key.
+        signatureBase64:
+          type: string
+          description: Signature over `register:{did}:{timestamp}`.
+        timestamp:
+          type: string
+    RevokeDIDRequest:
+      type: object
+      required: [did, signatureBase64, timestamp]
+      properties:
+        did:
+          $ref: "#/components/schemas/DID"
+        signatureBase64:
+          type: string
+          description: Signature over `revoke:{did}:{timestamp}`.
+        timestamp:
+          type: string
+    UpdateDIDRequest:
+      type: object
+      required: [publicKeyBase64, signatureBase64, timestamp]
+      properties:
+        did:
+          $ref: "#/components/schemas/DID"
+        publicKeyBase64:
+          type: string
+          description: New base64 encoded Ed25519 public key.
+        context:
+          type: array
+          items:
+            type: string
+        signatureBase64:
+          type: string
+          description: Signature over `update:{did}:{newPublicKeyBase64}:{timestamp}`.
+        timestamp:
+          type: string
+    DIDMutationResponse:
+      type: object
+      required: [did, txHash, status]
+      properties:
+        did:
+          $ref: "#/components/schemas/DID"
+        txHash:
+          type: string
+        status:
+          type: string
+          enum: [REGISTERED, UPDATED]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    RevokeDIDResponse:
+      type: object
+      required: [status, did]
+      properties:
+        status:
+          type: string
+          const: REVOKED
+        did:
+          $ref: "#/components/schemas/DID"
+    DIDDocument:
+      type: object
+      required: ["@context", id, publicKeyBase64, created, updated, deactivated]
+      properties:
+        "@context":
+          type: array
+          items:
+            type: string
+        id:
+          $ref: "#/components/schemas/DID"
+        publicKeyBase64:
+          type: string
+        created:
+          type: string
+          format: date-time
+        updated:
+          type: string
+          format: date-time
+        deactivated:
+          type: boolean
+    DIDResolutionResponse:
+      type: object
+      required: [didDocument, didDocumentMetadata, didResolutionMetadata]
+      properties:
+        didDocument:
+          $ref: "#/components/schemas/DIDDocument"
+        didDocumentMetadata:
+          type: object
+          required: [created, updated, deactivated]
+          properties:
+            created:
+              type: string
+              format: date-time
+            updated:
+              type: string
+              format: date-time
+            deactivated:
+              type: boolean
+        didResolutionMetadata:
+          type: object
+          required: [contentType]
+          properties:
+            contentType:
+              type: string
+              examples: [application/did+ld+json]
+    CreateChallengeRequest:
+      type: object
+      required: [serviceId]
+      properties:
+        serviceId:
+          type: string
+        serviceName:
+          type: string
+        requestedClaims:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    AuthChallenge:
+      type: object
+      required: [challengeId, nonce, serviceId, serviceName, issuedAt, expiresAt, qrCode]
+      properties:
+        challengeId:
+          type: string
+        nonce:
+          type: string
+        serviceId:
+          type: string
+        serviceName:
+          type: string
+        issuedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        qrCode:
+          type: string
+    VerifyAuthRequest:
+      type: object
+      required: [challengeId, presentation]
+      properties:
+        challengeId:
+          type: string
+        serviceId:
+          type: string
+        presentation:
+          type: string
+          description: Base64 encoded authentication presentation.
+    AuthVerificationResult:
+      type: object
+      required: [valid, did, verifiedAt, verifiedClaims]
+      properties:
+        valid:
+          type: boolean
+        did:
+          type: string
+        verifiedAt:
+          type: string
+          format: date-time
+        verifiedClaims:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        reason:
+          type: string
+    CredentialProof:
+      type: object
+      required: [type, verificationMethod, proofPurpose, proofValue]
+      properties:
+        type:
+          type: string
+          examples: [Ed25519Signature2020]
+        created:
+          type: string
+          format: date-time
+        verificationMethod:
+          type: string
+        proofPurpose:
+          type: string
+          enum: [assertionMethod, authentication]
+        proofValue:
+          type: string
+    VerifiableCredential:
+      type: object
+      required: ["@context", id, type, issuer, issuanceDate, credentialSubject, proof]
+      properties:
+        "@context":
+          type: array
+          items:
+            type: string
+        id:
+          type: string
+        type:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        issuer:
+          oneOf:
+            - $ref: "#/components/schemas/DID"
+            - type: object
+              required: [id]
+              properties:
+                id:
+                  $ref: "#/components/schemas/DID"
+                name:
+                  type: string
+        issuanceDate:
+          type: string
+          format: date-time
+        expirationDate:
+          type: string
+          format: date-time
+        credentialSubject:
+          type: object
+          required: [id]
+          properties:
+            id:
+              $ref: "#/components/schemas/DID"
+          additionalProperties: true
+        proof:
+          $ref: "#/components/schemas/CredentialProof"
+    CredentialRecord:
+      type: object
+      required: [id, issuer, subject, types, credential, issuanceDate, createdAt]
+      properties:
+        id:
+          type: string
+        issuer:
+          $ref: "#/components/schemas/DID"
+        subject:
+          $ref: "#/components/schemas/DID"
+        types:
+          type: array
+          items:
+            type: string
+        credential:
+          $ref: "#/components/schemas/VerifiableCredential"
+        issuanceDate:
+          type: string
+          format: date-time
+        expirationDate:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        revokedAt:
+          type: string
+          format: date-time
+        revocationReason:
+          type: string
+    ListCredentialsResponse:
+      type: object
+      required: [did, credentials]
+      properties:
+        did:
+          $ref: "#/components/schemas/DID"
+        credentials:
+          type: array
+          items:
+            $ref: "#/components/schemas/CredentialRecord"
+    IssueCredentialRequest:
+      type: object
+      required: [credential]
+      properties:
+        credential:
+          $ref: "#/components/schemas/VerifiableCredential"
+    IssueCredentialResponse:
+      type: object
+      required: [status, credential]
+      properties:
+        status:
+          type: string
+          const: ISSUED
+        credential:
+          $ref: "#/components/schemas/CredentialRecord"
+    RevokeCredentialRequest:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+        reason:
+          type: string
+    RevokeCredentialResponse:
+      type: object
+      required: [status, id]
+      properties:
+        status:
+          type: string
+          const: REVOKED
+        id:
+          type: string
+    CredentialStatusResponse:
+      type: object
+      required: [id, valid, verifiedAt]
+      properties:
+        id:
+          type: string
+        valid:
+          type: boolean
+        reason:
+          type: string
+        issuer:
+          $ref: "#/components/schemas/DID"
+        subject:
+          $ref: "#/components/schemas/DID"
+        types:
+          type: array
+          items:
+            type: string
+        verifiedAt:
+          type: string
+          format: date-time
+    ApiKeyRecord:
+      type: object
+      required: [serviceId, serviceName, createdAt]
+      properties:
+        serviceId:
+          type: string
+        serviceName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        revokedAt:
+          type: string
+          format: date-time
+    CreateApiKeyRequest:
+      type: object
+      required: [serviceId]
+      properties:
+        serviceId:
+          type: string
+        serviceName:
+          type: string
+    CreateApiKeyResponse:
+      type: object
+      required: [apiKey, record]
+      properties:
+        apiKey:
+          type: string
+          description: Plaintext API key. Returned only once.
+        record:
+          $ref: "#/components/schemas/ApiKeyRecord"
+    ListApiKeysResponse:
+      type: object
+      required: [apiKeys]
+      properties:
+        apiKeys:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiKeyRecord"
+    RevokeApiKeyRequest:
+      type: object
+      required: [serviceId]
+      properties:
+        serviceId:
+          type: string
+    RevokeApiKeyResponse:
+      type: object
+      required: [status, serviceId]
+      properties:
+        status:
+          type: string
+          const: REVOKED
+        serviceId:
+          type: string
+    GenerateProofRequest:
+      type: object
+      required: [did, type]
+      properties:
+        did:
+          $ref: "#/components/schemas/DID"
+        type:
+          type: string
+        params:
+          type: object
+          additionalProperties: true
+    ZkProofEnvelope:
+      type: object
+      required: [protocol, curve, type, proof, publicSignals]
+      properties:
+        protocol:
+          type: string
+          enum: [groth16, plonk]
+        curve:
+          type: string
+          enum: [bn128, bls12381]
+        type:
+          type: string
+        circuit:
+          type: string
+        mode:
+          type: string
+        params:
+          type: object
+          additionalProperties: true
+        serviceUrl:
+          type: string
+        proof:
+          type: object
+          required: [pi_a, pi_b, pi_c]
+          properties:
+            pi_a:
+              type: array
+              items:
+                type: string
+            pi_b:
+              type: array
+              items:
+                type: array
+                items:
+                  type: string
+            pi_c:
+              type: array
+              items:
+                type: string
+        publicSignals:
+          type: array
+          items:
+            type: string
+        publicClaims:
+          type: object
+          additionalProperties: true
+    GenerateProofResponse:
+      type: object
+      required: [proof]
+      properties:
+        proof:
+          $ref: "#/components/schemas/ZkProofEnvelope"
+    VerifyClaimRequest:
+      type: object
+      required: [did, claimType, proof]
+      properties:
+        did:
+          $ref: "#/components/schemas/DID"
+        claimType:
+          type: string
+        params:
+          type: object
+          additionalProperties: true
+        proof:
+          $ref: "#/components/schemas/ZkProofEnvelope"
+    ClaimVerificationResult:
+      type: object
+      required: [valid, claimType, verifiedAt, publicClaims]
+      properties:
+        valid:
+          type: boolean
+        claimType:
+          type: string
+        verifiedAt:
+          type: string
+          format: date-time
+        publicClaims:
+          type: object
+          additionalProperties: true
+        reason:
+          type: string
+    RegistryStats:
+      type: object
+      required: [totalDIDs, activeDIDs, deactivatedDIDs, backend]
+      properties:
+        totalDIDs:
+          type: integer
+        activeDIDs:
+          type: integer
+        deactivatedDIDs:
+          type: integer
+        backend:
+          type: string

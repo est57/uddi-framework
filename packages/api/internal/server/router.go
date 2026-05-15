@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/uddi-protocol/uddi/api/internal/apidocs"
 	"github.com/uddi-protocol/uddi/api/internal/blockchain"
 	"github.com/uddi-protocol/uddi/api/internal/config"
 	"github.com/uddi-protocol/uddi/api/internal/handlers"
@@ -63,6 +64,11 @@ func NewRouter(cfg *config.Config, chainClient *blockchain.Client, zkpService *z
 		_, _ = w.Write([]byte(`{"status":"ready","version":"0.1.0"}`))
 	})
 	r.Get("/metrics", metrics.Handler)
+	r.Get("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		_, _ = w.Write(apidocs.OpenAPIYAML)
+	})
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Route("/did", func(r chi.Router) {
