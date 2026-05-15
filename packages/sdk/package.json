@@ -1,6 +1,6 @@
 {
   "name": "@uddi/sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "UDDI client and verifier SDK for application integration",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
