@@ -145,6 +145,8 @@ If Docker reports that `uddi-api`, `uddi-postgres`, or `uddi-redis` is already i
 docker rm uddi-api uddi-postgres uddi-redis
 ```
 
+On Docker Desktop, the API may briefly log `DID database not ready; retrying` after `down` and `up` while Docker DNS and Postgres are coming back. The API retries startup database connection automatically. If it still fails after all retries, recreate the stack with the `down -v --remove-orphans` command above.
+
 Run the end-to-end authentication example:
 
 ```bash

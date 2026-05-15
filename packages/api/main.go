@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -17,6 +18,11 @@ import (
 	"github.com/uddi-protocol/uddi/api/internal/config"
 	"github.com/uddi-protocol/uddi/api/internal/server"
 	"github.com/uddi-protocol/uddi/api/internal/zkp"
+)
+
+const (
+	startupDependencyAttempts = 12
+	startupDependencyDelay    = 2 * time.Second
 )
 
 func main() {
@@ -36,9 +42,7 @@ func main() {
 	// ── Dependencies ──────────────────────────────────────────────────────────
 	var chainClient *blockchain.Client
 	if cfg.DatabaseURL != "" {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		store, err := blockchain.NewPostgresDIDStore(ctx, cfg.DatabaseURL)
-		cancel()
+		store, err := connectPostgresDIDStore(cfg.DatabaseURL, logger)
 		if err != nil {
 			logger.Error("failed to connect to DID database", "error", err)
 			os.Exit(1)
@@ -99,4 +103,36 @@ func main() {
 		logger.Error("forced shutdown", "error", err)
 	}
 	logger.Info("Server stopped")
+}
+
+func connectPostgresDIDStore(databaseURL string, logger *slog.Logger) (*blockchain.PostgresDIDStore, error) {
+	var lastErr error
+
+	for attempt := 1; attempt <= startupDependencyAttempts; attempt++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		store, err := blockchain.NewPostgresDIDStore(ctx, databaseURL)
+		cancel()
+		if err == nil {
+			if attempt > 1 {
+				logger.Info("connected to DID database", "attempt", attempt)
+			}
+			return store, nil
+		}
+
+		lastErr = err
+		if attempt == startupDependencyAttempts {
+			break
+		}
+
+		logger.Warn(
+			"DID database not ready; retrying",
+			"attempt", attempt,
+			"maxAttempts", startupDependencyAttempts,
+			"retryIn", startupDependencyDelay.String(),
+			"error", err,
+		)
+		time.Sleep(startupDependencyDelay)
+	}
+
+	return nil, fmt.Errorf("database not ready after %d attempts: %w", startupDependencyAttempts, lastErr)
 }

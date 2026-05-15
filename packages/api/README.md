@@ -116,6 +116,8 @@ docker compose -f infra/docker/docker-compose.dev.yml down -v --remove-orphans
 docker compose -f infra/docker/docker-compose.dev.yml up --build
 ```
 
+On Docker Desktop, the API may briefly log `DID database not ready; retrying` after `down` and `up` while Docker DNS and Postgres are coming back. The API retries startup database connection automatically. If it still fails after all retries, recreate the stack with the `down -v --remove-orphans` command above.
+
 The current compose stack runs:
 
 - API gateway
