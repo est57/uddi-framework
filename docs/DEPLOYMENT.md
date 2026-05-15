@@ -200,6 +200,8 @@ pnpm e2e:smoke
 
 The smoke test creates a temporary service API key through the admin endpoint, registers a holder DID, rotates its signing key, verifies an auth challenge, issues and revokes a credential, and checks `/health`, `/ready`, `/metrics`, `/openapi.yaml`, and `/docs`.
 
+The same smoke test is available in GitHub Actions as the `E2E Smoke` workflow. It can be started manually from the Actions tab and also runs for release tags.
+
 For a non-default endpoint:
 
 ```bash

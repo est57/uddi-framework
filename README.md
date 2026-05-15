@@ -126,6 +126,8 @@ Verify the Docker API and SDK together with the E2E smoke test:
 pnpm e2e:smoke
 ```
 
+The same smoke test is available as the manual `E2E Smoke` workflow in GitHub Actions and runs automatically for release tags.
+
 With compose running, run the optional Postgres integration test:
 
 ```bash
