@@ -46,11 +46,16 @@ type memoryAPIKeyRecord struct {
 }
 
 func NewMemoryAPIKeyStore() *MemoryAPIKeyStore {
+	return NewMemoryAPIKeyStoreWithDevSeeds(true)
+}
+
+func NewMemoryAPIKeyStoreWithDevSeeds(seedDevKeys bool) *MemoryAPIKeyStore {
 	store := &MemoryAPIKeyStore{
 		keys: make(map[string]memoryAPIKeyRecord),
 	}
-	_, _ = store.Create(context.Background(), "dev-service", "UDDI Dev Service", "dev-api-key")
-	_, _ = store.Create(context.Background(), "test-service", "UDDI Test Service", "test-key")
+	if seedDevKeys {
+		_ = seedDevelopmentAPIKeys(context.Background(), store)
+	}
 	return store
 }
 
@@ -118,18 +123,38 @@ type PostgresAPIKeyStore struct {
 	db *sql.DB
 }
 
-func NewPostgresAPIKeyStore(ctx context.Context, databaseURL string) (*PostgresAPIKeyStore, error) {
+func NewPostgresAPIKeyStore(ctx context.Context, databaseURL string, seedDevKeys bool) (*PostgresAPIKeyStore, error) {
 	db, err := storage.OpenPostgres(ctx, databaseURL)
 	if err != nil {
 		return nil, err
 	}
 
 	store := &PostgresAPIKeyStore{db: db}
-	if err := store.seed(ctx); err != nil {
-		_ = db.Close()
-		return nil, err
+	if seedDevKeys {
+		if err := seedDevelopmentAPIKeys(ctx, store); err != nil {
+			_ = db.Close()
+			return nil, err
+		}
 	}
 	return store, nil
+}
+
+func seedDevelopmentAPIKeys(ctx context.Context, store APIKeyStore) error {
+	seeds := []struct {
+		serviceID   string
+		serviceName string
+		apiKey      string
+	}{
+		{"dev-service", "UDDI Dev Service", "dev-api-key"},
+		{"test-service", "UDDI Test Service", "test-key"},
+	}
+
+	for _, seed := range seeds {
+		if _, err := store.Create(ctx, seed.serviceID, seed.serviceName, seed.apiKey); err != nil && !errors.Is(err, ErrAPIKeyExists) {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *PostgresAPIKeyStore) Close() error {
@@ -206,29 +231,6 @@ func (s *PostgresAPIKeyStore) Revoke(ctx context.Context, serviceID string) erro
 	}
 	if rowsAffected == 0 {
 		return ErrAPIKeyNotFound
-	}
-	return nil
-}
-
-func (s *PostgresAPIKeyStore) seed(ctx context.Context) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-	seeds := []struct {
-		serviceID   string
-		serviceName string
-		apiKey      string
-	}{
-		{"dev-service", "UDDI Dev Service", "dev-api-key"},
-		{"test-service", "UDDI Test Service", "test-key"},
-	}
-
-	for _, seed := range seeds {
-		if _, err := s.db.ExecContext(ctx, `
-			INSERT INTO api_keys (service_id, service_name, api_key_hash, created_at)
-			VALUES ($1, $2, $3, $4)
-			ON CONFLICT (service_id) DO NOTHING
-		`, seed.serviceID, seed.serviceName, hashAPIKey(seed.apiKey), now); err != nil {
-			return err
-		}
 	}
 	return nil
 }

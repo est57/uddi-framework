@@ -161,3 +161,5 @@ Tests also seed:
 X-Service-ID: test-service
 X-API-Key: test-key
 ```
+
+When `UDDI_ENV=production`, development API keys are not seeded. Create service keys through the admin API after bootstrapping a non-development `UDDI_ADMIN_TOKEN`.

@@ -121,14 +121,15 @@ func NewRouter(cfg *config.Config, chainClient *blockchain.Client, zkpService *z
 }
 
 func newAPIKeyStore(cfg *config.Config) (middleware.APIKeyStore, error) {
+	seedDevKeys := !cfg.IsProduction()
 	if cfg.DatabaseURL == "" {
-		return middleware.NewMemoryAPIKeyStore(), nil
+		return middleware.NewMemoryAPIKeyStoreWithDevSeeds(seedDevKeys), nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	store, err := middleware.NewPostgresAPIKeyStore(ctx, cfg.DatabaseURL)
+	store, err := middleware.NewPostgresAPIKeyStore(ctx, cfg.DatabaseURL, seedDevKeys)
 	if err != nil {
 		return nil, fmt.Errorf("create Postgres API key store: %w", err)
 	}

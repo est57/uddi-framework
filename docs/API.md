@@ -13,12 +13,14 @@ X-API-Key: dev-api-key
 Content-Type: application/json
 ```
 
-The development API key store seeds two credentials in memory and Postgres:
+In non-production environments, the development API key store seeds two credentials in memory and Postgres:
 
 | Service ID | API Key |
 | --- | --- |
 | `dev-service` | `dev-api-key` |
 | `test-service` | `test-key` |
+
+When `UDDI_ENV=production`, these credentials are not seeded.
 
 Error responses use this shape:
 

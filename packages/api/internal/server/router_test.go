@@ -112,6 +112,25 @@ func TestAPIKeyMiddleware(t *testing.T) {
 	assertJSONField(t, res.Body.Bytes(), "error", "missing API key")
 }
 
+func TestProductionRouterDoesNotSeedDevelopmentAPIKeys(t *testing.T) {
+	router := newTestRouterWithConfig(t, &config.Config{
+		Environment:    "production",
+		AdminToken:     "production-admin-token",
+		AllowedOrigins: []string{"https://app.example"},
+	})
+
+	res := performRequest(router, http.MethodPost, "/v1/verify/challenge", map[string]any{
+		"serviceId": "dev-service",
+	}, map[string]string{
+		"X-Service-ID": "dev-service",
+		"X-API-Key":    "dev-api-key",
+	})
+	if res.Code != http.StatusUnauthorized {
+		t.Fatalf("expected seeded dev key to be unavailable in production, got %d: %s", res.Code, res.Body.String())
+	}
+	assertJSONField(t, res.Body.Bytes(), "error", "invalid API key")
+}
+
 func TestAdminAPIKeyLifecycle(t *testing.T) {
 	router := newTestRouterWithConfig(t, &config.Config{
 		AdminToken:     "admin-token",

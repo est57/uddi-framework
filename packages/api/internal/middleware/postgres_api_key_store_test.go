@@ -17,7 +17,7 @@ func TestPostgresAPIKeyStoreValidatesSeededDevKey(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	store, err := NewPostgresAPIKeyStore(ctx, databaseURL)
+	store, err := NewPostgresAPIKeyStore(ctx, databaseURL, true)
 	if err != nil {
 		t.Fatalf("new postgres API key store: %v", err)
 	}

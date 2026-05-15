@@ -64,3 +64,19 @@ func TestMemoryAPIKeyStoreCreateListAndRevoke(t *testing.T) {
 		t.Fatalf("expected revoked key to be invalid, got %v", err)
 	}
 }
+
+func TestMemoryAPIKeyStoreCanDisableDevSeeds(t *testing.T) {
+	store := NewMemoryAPIKeyStoreWithDevSeeds(false)
+
+	if err := store.Validate(context.Background(), "dev-service", "dev-api-key"); !errors.Is(err, ErrAPIKeyInvalid) {
+		t.Fatalf("expected dev seed to be absent, got %v", err)
+	}
+
+	records, err := store.List(context.Background())
+	if err != nil {
+		t.Fatalf("list API keys: %v", err)
+	}
+	if len(records) != 0 {
+		t.Fatalf("expected no seeded records, got %d", len(records))
+	}
+}

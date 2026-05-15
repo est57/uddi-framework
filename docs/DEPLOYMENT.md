@@ -49,6 +49,10 @@ openssl rand -base64 32
 
 Do not use the development values from `.env.example` or `infra/docker/docker-compose.dev.yml` in a shared environment.
 
+When `UDDI_ENV=production`, the API refuses to start if `UDDI_ADMIN_TOKEN` is empty or still set to the development placeholder. Production also rejects wildcard CORS origins such as `UDDI_ALLOWED_ORIGINS=*`.
+
+Development API keys such as `dev-service/dev-api-key` and `test-service/test-key` are seeded only outside production. In production, create every service API key explicitly through the admin API.
+
 ## Production-Like Compose
 
 This is a reference shape. Store real secrets in a secret manager or protected environment file.
